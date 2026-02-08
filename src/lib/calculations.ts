@@ -8,6 +8,7 @@ import {
   PortfolioData,
   UnifiedTransaction,
   HoldingStats,
+  DcaDataPoint,
 } from "./types";
 
 export function calculateHolding(
@@ -244,4 +245,24 @@ export function computeHoldingStats(transactions: UnifiedTransaction[]): Holding
     firstTradeDate,
     lastTradeDate,
   };
+}
+
+export function computeDcaTimeline(transactions: UnifiedTransaction[]): DcaDataPoint[] {
+  const spotBuys = transactions
+    .filter((tx) => tx.source === "spot" && tx.type === "buy")
+    .sort((a, b) => a.date - b.date);
+
+  let totalInvested = 0;
+  let totalQty = 0;
+
+  return spotBuys.map((tx) => {
+    totalInvested += tx.quoteAmount;
+    totalQty += tx.quantity;
+    return {
+      date: tx.date,
+      avgCost: totalQty > 0 ? totalInvested / totalQty : 0,
+      totalInvested,
+      totalQty,
+    };
+  });
 }

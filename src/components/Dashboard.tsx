@@ -3,12 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { BinanceBalance, BinanceTrade, BinanceTickerPrice, BinanceAutoInvestTransaction, BinanceAssetDividend, PortfolioData } from "@/lib/types";
 import { buildPortfolio } from "@/lib/calculations";
+import dynamic from "next/dynamic";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
 import PortfolioTable from "./PortfolioTable";
 import HoldingDetail from "./HoldingDetail";
 import Sidebar from "./Sidebar";
 import CoinIcon from "./CoinIcon";
+
+const DcaAnalysis = dynamic(() => import("./DcaAnalysis"), { ssr: false });
+const DcaDetail = dynamic(() => import("./DcaDetail"), { ssr: false });
 
 type Phase = "idle" | "account" | "earn" | "trades" | "prices" | "done";
 
@@ -66,6 +70,7 @@ export default function Dashboard() {
   const [rawAutoInvestByAsset, setRawAutoInvestByAsset] = useState<Record<string, BinanceAutoInvestTransaction[]>>({});
   const [rawDividendsByAsset, setRawDividendsByAsset] = useState<Record<string, BinanceAssetDividend[]>>({});
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const [selectedDcaAsset, setSelectedDcaAsset] = useState<string | null>(null);
   const [lastPriceUpdate, setLastPriceUpdate] = useState<number | null>(null);
   const [secondsAgo, setSecondsAgo] = useState(0);
 
@@ -281,6 +286,34 @@ export default function Dashboard() {
     } else {
       setSelectedAsset(null);
     }
+  } else if (activeTab === "dca" && selectedDcaAsset && portfolio) {
+    const holding = portfolio.holdings.find((h) => h.asset === selectedDcaAsset);
+    if (holding) {
+      const trades = rawTradesBySymbol[holding.symbol] || [];
+      const autoInvest = rawAutoInvestByAsset[holding.asset] || [];
+      const dividends = rawDividendsByAsset[holding.asset] || [];
+      content = (
+        <DcaDetail
+          holding={holding}
+          trades={trades}
+          autoInvestTxs={autoInvest}
+          dividends={dividends}
+          onBack={() => setSelectedDcaAsset(null)}
+        />
+      );
+    } else {
+      setSelectedDcaAsset(null);
+    }
+  } else if (activeTab === "dca") {
+    content = (
+      <DcaAnalysis
+        portfolio={portfolio}
+        rawTradesBySymbol={rawTradesBySymbol}
+        rawAutoInvestByAsset={rawAutoInvestByAsset}
+        rawDividendsByAsset={rawDividendsByAsset}
+        onSelectAsset={setSelectedDcaAsset}
+      />
+    );
   } else if (activeTab === "overview") {
     // Top 5 holdings for the overview grid
     const topHoldings = portfolio.holdings.slice(0, 5);
@@ -432,7 +465,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Sidebar activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); setSelectedAsset(null); setSelectedDcaAsset(null); }} />
       <main className="ml-60 flex-1 px-8 py-8">
         {content}
       </main>

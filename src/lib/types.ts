@@ -121,6 +121,13 @@ export interface KlineDataPoint {
   value: number; // Close price
 }
 
+export interface DcaDataPoint {
+  date: number;      // timestamp ms
+  avgCost: number;   // running weighted avg buy price
+  totalInvested: number;
+  totalQty: number;
+}
+
 export interface HoldingStats {
   totalTransactions: number;
   totalBuyTransactions: number;
