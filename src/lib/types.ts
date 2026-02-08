@@ -87,3 +87,30 @@ export interface PortfolioData {
   totalPnL: number;
   totalPnLPercent: number;
 }
+
+export interface UnifiedTransaction {
+  id: string;
+  date: number; // timestamp ms
+  type: "buy" | "sell";
+  source: "spot" | "auto-invest";
+  price: number;
+  quantity: number;
+  quoteAmount: number;
+  fee: number;
+  feeAsset: string;
+}
+
+export interface HoldingStats {
+  totalTransactions: number;
+  totalBuyTransactions: number;
+  totalSellTransactions: number;
+  avgBuyPrice: number;
+  highestBuyPrice: number;
+  lowestBuyPrice: number;
+  totalFeesPaid: number;
+  totalBought: number;
+  totalSold: number;
+  totalCostBasis: number;
+  firstTradeDate: number;
+  lastTradeDate: number;
+}

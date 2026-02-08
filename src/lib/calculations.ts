@@ -5,6 +5,8 @@ import {
   BinanceAutoInvestTransaction,
   CryptoHolding,
   PortfolioData,
+  UnifiedTransaction,
+  HoldingStats,
 } from "./types";
 
 export function calculateHolding(
@@ -119,5 +121,101 @@ export function buildPortfolio(
     totalCurrentValue,
     totalPnL,
     totalPnLPercent,
+  };
+}
+
+export function unifyTransactions(
+  asset: string,
+  symbol: string,
+  trades: BinanceTrade[],
+  autoInvestTxs: BinanceAutoInvestTransaction[]
+): UnifiedTransaction[] {
+  const unified: UnifiedTransaction[] = [];
+
+  for (const t of trades) {
+    unified.push({
+      id: `spot-${t.id}`,
+      date: t.time,
+      type: t.isBuyer ? "buy" : "sell",
+      source: "spot",
+      price: parseFloat(t.price),
+      quantity: parseFloat(t.qty),
+      quoteAmount: parseFloat(t.quoteQty),
+      fee: parseFloat(t.commission),
+      feeAsset: t.commissionAsset,
+    });
+  }
+
+  for (const tx of autoInvestTxs) {
+    unified.push({
+      id: `auto-${tx.id}`,
+      date: tx.transactionDateTime,
+      type: "buy",
+      source: "auto-invest",
+      price: parseFloat(tx.executionPrice),
+      quantity: parseFloat(tx.targetAssetAmount),
+      quoteAmount: parseFloat(tx.sourceAssetAmount),
+      fee: parseFloat(tx.transactionFee),
+      feeAsset: tx.transactionFeeUnit,
+    });
+  }
+
+  // Sort newest first
+  unified.sort((a, b) => b.date - a.date);
+  return unified;
+}
+
+export function computeHoldingStats(transactions: UnifiedTransaction[]): HoldingStats {
+  let totalBuyTransactions = 0;
+  let totalSellTransactions = 0;
+  let totalBought = 0;
+  let totalSold = 0;
+  let totalCostBasis = 0;
+  let totalFeesPaid = 0;
+  let highestBuyPrice = 0;
+  let lowestBuyPrice = Infinity;
+  let weightedPriceSum = 0;
+  let weightedQtySum = 0;
+  let firstTradeDate = Infinity;
+  let lastTradeDate = 0;
+
+  for (const tx of transactions) {
+    if (tx.date < firstTradeDate) firstTradeDate = tx.date;
+    if (tx.date > lastTradeDate) lastTradeDate = tx.date;
+
+    // Approximate fee in USDT: if feeAsset is USDT, use directly; otherwise use price * fee as rough estimate
+    const feeUsdt = tx.feeAsset === "USDT" ? tx.fee : tx.fee * tx.price;
+    totalFeesPaid += feeUsdt;
+
+    if (tx.type === "buy") {
+      totalBuyTransactions++;
+      totalBought += tx.quantity;
+      totalCostBasis += tx.quoteAmount;
+      weightedPriceSum += tx.price * tx.quantity;
+      weightedQtySum += tx.quantity;
+      if (tx.price > highestBuyPrice) highestBuyPrice = tx.price;
+      if (tx.price < lowestBuyPrice) lowestBuyPrice = tx.price;
+    } else {
+      totalSellTransactions++;
+      totalSold += tx.quantity;
+    }
+  }
+
+  if (lowestBuyPrice === Infinity) lowestBuyPrice = 0;
+  if (firstTradeDate === Infinity) firstTradeDate = 0;
+
+  return {
+    totalTransactions: transactions.length,
+    totalBuyTransactions,
+    totalSellTransactions,
+    avgBuyPrice: weightedQtySum > 0 ? weightedPriceSum / weightedQtySum : 0,
+    highestBuyPrice,
+    lowestBuyPrice,
+    totalFeesPaid,
+    totalBought,
+    totalSold,
+    totalCostBasis,
+    firstTradeDate,
+    lastTradeDate,
   };
 }

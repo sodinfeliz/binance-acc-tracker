@@ -5,6 +5,7 @@ import CoinIcon from "./CoinIcon";
 
 interface PortfolioTableProps {
   holdings: CryptoHolding[];
+  onSelectHolding?: (asset: string) => void;
 }
 
 function formatUsd(value: number): string {
@@ -28,7 +29,7 @@ function pnlColor(value: number): string {
   return "text-[#848e9c]";
 }
 
-export default function PortfolioTable({ holdings }: PortfolioTableProps) {
+export default function PortfolioTable({ holdings, onSelectHolding }: PortfolioTableProps) {
   return (
     <div className="rounded-xl bg-[#1e2329]">
       <table className="w-full text-sm">
@@ -48,7 +49,8 @@ export default function PortfolioTable({ holdings }: PortfolioTableProps) {
           {holdings.map((h, i) => (
             <tr
               key={h.asset}
-              className={`transition-colors hover:bg-[#2b3139] ${
+              onClick={() => onSelectHolding?.(h.asset)}
+              className={`cursor-pointer transition-colors hover:bg-[#2b3139] ${
                 i < holdings.length - 1 ? "border-b border-[#2b3139]" : ""
               }`}
             >

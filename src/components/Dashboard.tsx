@@ -6,6 +6,7 @@ import { buildPortfolio } from "@/lib/calculations";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
 import PortfolioTable from "./PortfolioTable";
+import HoldingDetail from "./HoldingDetail";
 import Sidebar from "./Sidebar";
 import CoinIcon from "./CoinIcon";
 
@@ -61,6 +62,9 @@ export default function Dashboard() {
   const [usdtBalance, setUsdtBalance] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [rawTradesBySymbol, setRawTradesBySymbol] = useState<Record<string, BinanceTrade[]>>({});
+  const [rawAutoInvestByAsset, setRawAutoInvestByAsset] = useState<Record<string, BinanceAutoInvestTransaction[]>>({});
+  const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
 
   const fetchPortfolio = useCallback(async () => {
     try {
@@ -157,6 +161,9 @@ export default function Dashboard() {
       }
       const prices: BinanceTickerPrice[] = await pricesRes.json();
 
+      setRawTradesBySymbol(tradesBySymbol);
+      setRawAutoInvestByAsset(autoInvestByAsset);
+
       const portfolioData = buildPortfolio(balances, tradesBySymbol, autoInvestByAsset, prices);
       setPortfolio(portfolioData);
       setPhase("done");
@@ -170,6 +177,14 @@ export default function Dashboard() {
     fetchPortfolio();
   }, [fetchPortfolio]);
 
+  const handleSelectHolding = (asset: string) => {
+    setSelectedAsset(asset);
+  };
+
+  const handleBackToList = () => {
+    setSelectedAsset(null);
+  };
+
   const pnlColor = portfolio && portfolio.totalPnL >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]";
 
   // Main content based on loading state
@@ -178,6 +193,22 @@ export default function Dashboard() {
     content = <ErrorMessage message={error} onRetry={fetchPortfolio} />;
   } else if (phase !== "done" || !portfolio) {
     content = <LoadingSpinner message={PHASE_MESSAGES[phase] || "Loading..."} />;
+  } else if (selectedAsset && portfolio) {
+    const holding = portfolio.holdings.find((h) => h.asset === selectedAsset);
+    if (holding) {
+      const trades = rawTradesBySymbol[holding.symbol] || [];
+      const autoInvest = rawAutoInvestByAsset[holding.asset] || [];
+      content = (
+        <HoldingDetail
+          holding={holding}
+          trades={trades}
+          autoInvestTxs={autoInvest}
+          onBack={handleBackToList}
+        />
+      );
+    } else {
+      setSelectedAsset(null);
+    }
   } else if (activeTab === "overview") {
     // Top 5 holdings for the overview grid
     const topHoldings = portfolio.holdings.slice(0, 5);
@@ -241,7 +272,8 @@ export default function Dashboard() {
             {topHoldings.map((h, i) => (
               <div
                 key={h.asset}
-                className={`flex items-center justify-between px-6 py-3.5 transition-colors hover:bg-[#2b3139] ${
+                onClick={() => handleSelectHolding(h.asset)}
+                className={`flex cursor-pointer items-center justify-between px-6 py-3.5 transition-colors hover:bg-[#2b3139] ${
                   i < topHoldings.length - 1 ? "border-b border-[#2b3139]" : ""
                 }`}
               >
@@ -293,7 +325,7 @@ export default function Dashboard() {
         </div>
 
         {portfolio.holdings.length > 0 ? (
-          <PortfolioTable holdings={portfolio.holdings} />
+          <PortfolioTable holdings={portfolio.holdings} onSelectHolding={handleSelectHolding} />
         ) : (
           <p className="py-10 text-center text-sm text-[#848e9c]">
             No holdings found with USDT trading pairs.
