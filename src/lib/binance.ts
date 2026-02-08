@@ -9,6 +9,7 @@ import {
   BinanceEarnResponse,
   BinanceAutoInvestTransaction,
   BinanceAutoInvestResponse,
+  BinanceAssetDividend,
 } from "./types";
 
 const BASE_URL = "https://api.binance.com";
@@ -207,6 +208,47 @@ export async function getAutoInvestHistory(): Promise<BinanceAutoInvestTransacti
   }
 
   return allTransactions;
+}
+
+const ONE_HUNDRED_EIGHTY_DAYS_MS = 180 * 24 * 60 * 60 * 1000;
+
+export async function getAssetDividendHistory(): Promise<BinanceAssetDividend[]> {
+  const allDividends: BinanceAssetDividend[] = [];
+  const now = Date.now();
+  const earliest = new Date("2017-07-01").getTime();
+
+  let endTime = now;
+
+  while (endTime > earliest) {
+    const startTime = Math.max(endTime - ONE_HUNDRED_EIGHTY_DAYS_MS, earliest);
+
+    const res = await signedRequest<{ rows: BinanceAssetDividend[]; total: number }>(
+      "/sapi/v1/asset/assetDividend",
+      {
+        startTime: startTime.toString(),
+        endTime: endTime.toString(),
+        limit: "500",
+      }
+    );
+
+    if (!res.rows || res.rows.length === 0) {
+      endTime = startTime;
+      continue;
+    }
+
+    allDividends.push(...res.rows);
+
+    // If we got exactly 500 (the max), there may be more in this window.
+    // Move endTime to just before the oldest record to get the rest.
+    if (res.rows.length === 500) {
+      const oldestTime = Math.min(...res.rows.map((r) => r.divTime));
+      endTime = oldestTime - 1;
+    } else {
+      endTime = startTime;
+    }
+  }
+
+  return allDividends;
 }
 
 export async function getCurrentPrices(

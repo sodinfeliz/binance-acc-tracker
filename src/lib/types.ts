@@ -88,11 +88,20 @@ export interface PortfolioData {
   totalPnLPercent: number;
 }
 
+export interface BinanceAssetDividend {
+  id: number;
+  amount: string;
+  asset: string;
+  divTime: number;
+  enInfo: string;
+  tranId: number;
+}
+
 export interface UnifiedTransaction {
   id: string;
   date: number; // timestamp ms
-  type: "buy" | "sell";
-  source: "spot" | "auto-invest";
+  type: "buy" | "sell" | "reward";
+  source: "spot" | "auto-invest" | "earn";
   price: number;
   quantity: number;
   quoteAmount: number;
@@ -104,12 +113,14 @@ export interface HoldingStats {
   totalTransactions: number;
   totalBuyTransactions: number;
   totalSellTransactions: number;
+  totalRewardTransactions: number;
   avgBuyPrice: number;
   highestBuyPrice: number;
   lowestBuyPrice: number;
   totalFeesPaid: number;
   totalBought: number;
   totalSold: number;
+  totalRewards: number;
   totalCostBasis: number;
   firstTradeDate: number;
   lastTradeDate: number;

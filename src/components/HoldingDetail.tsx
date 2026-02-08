@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CryptoHolding, BinanceTrade, BinanceAutoInvestTransaction } from "@/lib/types";
+import { CryptoHolding, BinanceTrade, BinanceAutoInvestTransaction, BinanceAssetDividend } from "@/lib/types";
 import { unifyTransactions, computeHoldingStats } from "@/lib/calculations";
 import CoinIcon from "./CoinIcon";
 
@@ -9,6 +9,7 @@ interface HoldingDetailProps {
   holding: CryptoHolding;
   trades: BinanceTrade[];
   autoInvestTxs: BinanceAutoInvestTransaction[];
+  dividends: BinanceAssetDividend[];
   onBack: () => void;
 }
 
@@ -45,15 +46,16 @@ function formatDateTime(ts: number): string {
   });
 }
 
-export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }: HoldingDetailProps) {
+export default function HoldingDetail({ holding, trades, autoInvestTxs, dividends, onBack }: HoldingDetailProps) {
   const transactions = useMemo(
-    () => unifyTransactions(holding.asset, holding.symbol, trades, autoInvestTxs),
-    [holding.asset, holding.symbol, trades, autoInvestTxs]
+    () => unifyTransactions(holding.asset, holding.symbol, trades, autoInvestTxs, dividends),
+    [holding.asset, holding.symbol, trades, autoInvestTxs, dividends]
   );
 
   const stats = useMemo(() => computeHoldingStats(transactions), [transactions]);
 
-  const [sourceFilter, setSourceFilter] = useState<"all" | "spot" | "auto-invest">("all");
+  type SourceFilter = "all" | "spot" | "auto-invest" | "earn";
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
 
   const filteredTransactions = useMemo(
     () => sourceFilter === "all" ? transactions : transactions.filter((tx) => tx.source === sourceFilter),
@@ -61,7 +63,8 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }
   );
 
   const spotCount = useMemo(() => transactions.filter((tx) => tx.source === "spot").length, [transactions]);
-  const autoInvestCount = transactions.length - spotCount;
+  const autoInvestCount = useMemo(() => transactions.filter((tx) => tx.source === "auto-invest").length, [transactions]);
+  const earnCount = useMemo(() => transactions.filter((tx) => tx.source === "earn").length, [transactions]);
 
   const pnlColor = holding.pnlPercent >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]";
 
@@ -111,6 +114,13 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }
         <StatCard label="Lowest Entry" value={formatUsd(stats.lowestBuyPrice)} />
         <StatCard label="Total Bought" value={formatQty(stats.totalBought)} />
         <StatCard label="Total Sold" value={formatQty(stats.totalSold)} />
+        {stats.totalRewards > 0 && (
+          <StatCard
+            label="Earn Rewards"
+            value={formatQty(stats.totalRewards)}
+            sub={`~${formatUsd(stats.totalRewards * holding.currentPrice)} (${stats.totalRewardTransactions} distributions)`}
+          />
+        )}
       </div>
 
       {/* Date range */}
@@ -132,6 +142,7 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }
               { key: "all" as const, label: "All", count: transactions.length },
               { key: "spot" as const, label: "Spot", count: spotCount },
               { key: "auto-invest" as const, label: "Auto-Invest", count: autoInvestCount },
+              { key: "earn" as const, label: "Earn", count: earnCount },
             ]).map((tab) => (
               <button
                 key={tab.key}
@@ -170,22 +181,26 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }
                 >
                   <td className="px-6 py-3 text-[#eaecef]">{formatDateTime(tx.date)}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-medium ${tx.type === "buy" ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>
-                      {tx.type === "buy" ? "Buy" : "Sell"}
+                    <span className={`text-xs font-medium ${
+                      tx.type === "buy" ? "text-[#0ecb81]" : tx.type === "reward" ? "text-[#1e88e5]" : "text-[#f6465d]"
+                    }`}>
+                      {tx.type === "buy" ? "Buy" : tx.type === "reward" ? "Reward" : "Sell"}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`rounded px-1.5 py-0.5 text-xs ${
                       tx.source === "spot"
                         ? "bg-[#f0b90b]/15 text-[#f0b90b]"
+                        : tx.source === "earn"
+                        ? "bg-[#0ecb81]/15 text-[#0ecb81]"
                         : "bg-[#1e88e5]/15 text-[#1e88e5]"
                     }`}>
-                      {tx.source === "spot" ? "Spot" : "Auto-Invest"}
+                      {tx.source === "spot" ? "Spot" : tx.source === "earn" ? "Earn" : "Auto-Invest"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right text-[#eaecef]">{formatUsd(tx.price)}</td>
+                  <td className="px-4 py-3 text-right text-[#eaecef]">{tx.price > 0 ? formatUsd(tx.price) : "-"}</td>
                   <td className="px-4 py-3 text-right text-[#eaecef]">{formatQty(tx.quantity)}</td>
-                  <td className="px-4 py-3 text-right text-[#eaecef]">{formatUsd(tx.quoteAmount)}</td>
+                  <td className="px-4 py-3 text-right text-[#eaecef]">{tx.quoteAmount > 0 ? formatUsd(tx.quoteAmount) : "-"}</td>
                   <td className="px-6 py-3 text-right text-[#5e6673]">
                     {tx.fee > 0 ? `${formatQty(tx.fee)} ${tx.feeAsset}` : "-"}
                   </td>

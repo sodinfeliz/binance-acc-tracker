@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { BinanceBalance, BinanceTrade, BinanceTickerPrice, BinanceAutoInvestTransaction, PortfolioData } from "@/lib/types";
+import { BinanceBalance, BinanceTrade, BinanceTickerPrice, BinanceAutoInvestTransaction, BinanceAssetDividend, PortfolioData } from "@/lib/types";
 import { buildPortfolio } from "@/lib/calculations";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
@@ -64,6 +64,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [rawTradesBySymbol, setRawTradesBySymbol] = useState<Record<string, BinanceTrade[]>>({});
   const [rawAutoInvestByAsset, setRawAutoInvestByAsset] = useState<Record<string, BinanceAutoInvestTransaction[]>>({});
+  const [rawDividendsByAsset, setRawDividendsByAsset] = useState<Record<string, BinanceAssetDividend[]>>({});
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
 
   const fetchPortfolio = useCallback(async () => {
@@ -109,7 +110,7 @@ export default function Dashboard() {
       setPhase("trades");
       const symbols = assets.map((b) => `${b.asset}USDT`);
 
-      const [tradeResults, autoInvestTxs] = await Promise.all([
+      const [tradeResults, autoInvestTxs, earnRewards] = await Promise.all([
         Promise.allSettled(
           symbols.map(async (symbol) => {
             const res = await fetch(`/api/trades?symbol=${symbol}`);
@@ -124,6 +125,12 @@ export default function Dashboard() {
             return (await res.json()) as BinanceAutoInvestTransaction[];
           })
           .catch(() => [] as BinanceAutoInvestTransaction[]),
+        fetch("/api/earn-rewards")
+          .then(async (res) => {
+            if (!res.ok) return [];
+            return (await res.json()) as BinanceAssetDividend[];
+          })
+          .catch(() => [] as BinanceAssetDividend[]),
       ]);
 
       const tradesBySymbol: Record<string, BinanceTrade[]> = {};
@@ -147,6 +154,14 @@ export default function Dashboard() {
         autoInvestByAsset[tx.targetAsset].push(tx);
       }
 
+      const dividendsByAsset: Record<string, BinanceAssetDividend[]> = {};
+      for (const d of earnRewards) {
+        if (!dividendsByAsset[d.asset]) {
+          dividendsByAsset[d.asset] = [];
+        }
+        dividendsByAsset[d.asset].push(d);
+      }
+
       setPhase("prices");
       if (validSymbols.length === 0) {
         setPortfolio({ holdings: [], totalInvested: 0, totalCurrentValue: 0, totalPnL: 0, totalPnLPercent: 0 });
@@ -163,6 +178,7 @@ export default function Dashboard() {
 
       setRawTradesBySymbol(tradesBySymbol);
       setRawAutoInvestByAsset(autoInvestByAsset);
+      setRawDividendsByAsset(dividendsByAsset);
 
       const portfolioData = buildPortfolio(balances, tradesBySymbol, autoInvestByAsset, prices);
       setPortfolio(portfolioData);
@@ -198,11 +214,13 @@ export default function Dashboard() {
     if (holding) {
       const trades = rawTradesBySymbol[holding.symbol] || [];
       const autoInvest = rawAutoInvestByAsset[holding.asset] || [];
+      const dividends = rawDividendsByAsset[holding.asset] || [];
       content = (
         <HoldingDetail
           holding={holding}
           trades={trades}
           autoInvestTxs={autoInvest}
+          dividends={dividends}
           onBack={handleBackToList}
         />
       );

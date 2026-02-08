@@ -3,6 +3,7 @@ import {
   BinanceTickerPrice,
   BinanceBalance,
   BinanceAutoInvestTransaction,
+  BinanceAssetDividend,
   CryptoHolding,
   PortfolioData,
   UnifiedTransaction,
@@ -128,7 +129,8 @@ export function unifyTransactions(
   asset: string,
   symbol: string,
   trades: BinanceTrade[],
-  autoInvestTxs: BinanceAutoInvestTransaction[]
+  autoInvestTxs: BinanceAutoInvestTransaction[],
+  dividends: BinanceAssetDividend[] = []
 ): UnifiedTransaction[] {
   const unified: UnifiedTransaction[] = [];
 
@@ -160,6 +162,20 @@ export function unifyTransactions(
     });
   }
 
+  for (const d of dividends) {
+    unified.push({
+      id: `earn-${d.id}`,
+      date: d.divTime,
+      type: "reward",
+      source: "earn",
+      price: 0,
+      quantity: parseFloat(d.amount),
+      quoteAmount: 0,
+      fee: 0,
+      feeAsset: "",
+    });
+  }
+
   // Sort newest first
   unified.sort((a, b) => b.date - a.date);
   return unified;
@@ -168,8 +184,10 @@ export function unifyTransactions(
 export function computeHoldingStats(transactions: UnifiedTransaction[]): HoldingStats {
   let totalBuyTransactions = 0;
   let totalSellTransactions = 0;
+  let totalRewardTransactions = 0;
   let totalBought = 0;
   let totalSold = 0;
+  let totalRewards = 0;
   let totalCostBasis = 0;
   let totalFeesPaid = 0;
   let highestBuyPrice = 0;
@@ -182,6 +200,12 @@ export function computeHoldingStats(transactions: UnifiedTransaction[]): Holding
   for (const tx of transactions) {
     if (tx.date < firstTradeDate) firstTradeDate = tx.date;
     if (tx.date > lastTradeDate) lastTradeDate = tx.date;
+
+    if (tx.type === "reward") {
+      totalRewardTransactions++;
+      totalRewards += tx.quantity;
+      continue;
+    }
 
     // Approximate fee in USDT: if feeAsset is USDT, use directly; otherwise use price * fee as rough estimate
     const feeUsdt = tx.feeAsset === "USDT" ? tx.fee : tx.fee * tx.price;
@@ -208,12 +232,14 @@ export function computeHoldingStats(transactions: UnifiedTransaction[]): Holding
     totalTransactions: transactions.length,
     totalBuyTransactions,
     totalSellTransactions,
+    totalRewardTransactions,
     avgBuyPrice: weightedQtySum > 0 ? weightedPriceSum / weightedQtySum : 0,
     highestBuyPrice,
     lowestBuyPrice,
     totalFeesPaid,
     totalBought,
     totalSold,
+    totalRewards,
     totalCostBasis,
     firstTradeDate,
     lastTradeDate,
