@@ -110,8 +110,11 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, dividend
           sub={`${stats.totalBuyTransactions} buy / ${stats.totalSellTransactions} sell`}
         />
         <StatCard label="Total Fees" value={formatUsd(stats.totalFeesPaid)} />
-        <StatCard label="Highest Entry" value={formatUsd(stats.highestBuyPrice)} />
-        <StatCard label="Lowest Entry" value={formatUsd(stats.lowestBuyPrice)} />
+        <StatCard
+          label="Entry Range"
+          value={`${formatUsd(stats.lowestBuyPrice)} – ${formatUsd(stats.highestBuyPrice)}`}
+          sub="Low – High"
+        />
         <StatCard label="Total Bought" value={formatQty(stats.totalBought)} />
         <StatCard label="Total Sold" value={formatQty(stats.totalSold)} />
         {stats.totalRewards > 0 && (
