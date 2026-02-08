@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, AreaSeries, ColorType, LineStyle } from "lightweight-charts";
 import type { IChartApi, ISeriesApi, IPriceLine, UTCTimestamp } from "lightweight-charts";
-import type { KlineDataPoint } from "@/lib/types";
+import type { KlineDataPoint, UnifiedTransaction } from "@/lib/types";
 
 interface PriceChartProps {
   symbol: string;
   avgBuyPrice?: number;
+  transactions?: UnifiedTransaction[];
 }
 
 interface TimeframeOption {
@@ -22,6 +23,7 @@ const TIMEFRAMES: TimeframeOption[] = [
   { label: "1M", interval: "4h", limit: 180 },
   { label: "3M", interval: "1d", limit: 90 },
   { label: "1Y", interval: "1d", limit: 365 },
+  { label: "5Y", interval: "1w", limit: 260 },
   { label: "All", interval: "1w", limit: 1000 },
 ];
 
@@ -32,13 +34,109 @@ function getPricePrecision(minPrice: number): number {
   return 8;
 }
 
-export default function PriceChart({ symbol, avgBuyPrice }: PriceChartProps) {
+function snapToBar(timestampSec: number, barTimes: number[]): number {
+  let best = barTimes[0];
+  let bestDist = Math.abs(timestampSec - best);
+  for (let i = 1; i < barTimes.length; i++) {
+    const dist = Math.abs(timestampSec - barTimes[i]);
+    if (dist < bestDist) {
+      best = barTimes[i];
+      bestDist = dist;
+    }
+    if (barTimes[i] > timestampSec) break;
+  }
+  return best;
+}
+
+// Custom series primitive that draws "B"/"S" inside filled circles
+interface TradeMarkerData {
+  time: UTCTimestamp;
+  price: number;
+  isBuy: boolean;
+}
+
+function createTradeMarkersPrimitive() {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  let chart: any = null;
+  let series: any = null;
+  let reqUpdate: (() => void) | null = null;
+  let trades: TradeMarkerData[] = [];
+  let renderPts: { x: number; y: number; isBuy: boolean }[] = [];
+
+  const R = 8;
+
+  const view = {
+    renderer() {
+      const pts = renderPts;
+      return {
+        draw(target: any) {
+          target.useMediaCoordinateSpace(
+            ({ context: ctx }: { context: CanvasRenderingContext2D }) => {
+              ctx.font = "bold 10px sans-serif";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              for (const p of pts) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+                ctx.fillStyle = p.isBuy ? "#0ecb81" : "#f6465d";
+                ctx.fill();
+                ctx.fillStyle = "#fff";
+                ctx.fillText(p.isBuy ? "B" : "S", p.x, p.y);
+              }
+            }
+          );
+        },
+      };
+    },
+  };
+
+  return {
+    attached(params: any) {
+      chart = params.chart;
+      series = params.series;
+      reqUpdate = params.requestUpdate;
+    },
+    detached() {
+      chart = series = reqUpdate = null;
+    },
+    setTrades(t: TradeMarkerData[]) {
+      trades = t;
+      reqUpdate?.();
+    },
+    updateAllViews() {
+      renderPts = [];
+      if (!chart || !series) return;
+      const ts = chart.timeScale();
+      for (const t of trades) {
+        const x = ts.timeToCoordinate(t.time);
+        const y = series.priceToCoordinate(t.price);
+        if (x === null || y === null) continue;
+        renderPts.push({
+          x: x as number,
+          y: y as number,
+          isBuy: t.isBuy,
+        });
+      }
+    },
+    paneViews() {
+      return [view];
+    },
+  };
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+}
+
+type TradesPrimitive = ReturnType<typeof createTradeMarkersPrimitive>;
+
+export default function PriceChart({ symbol, avgBuyPrice, transactions }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
   const priceLineRef = useRef<IPriceLine | null>(null);
+  const tradesPrimitiveRef = useRef<TradesPrimitive | null>(null);
   const [activeTimeframe, setActiveTimeframe] = useState(3); // default 3M
-  const [showAvgBuy, setShowAvgBuy] = useState(true);
+  const [showAvgBuy, setShowAvgBuy] = useState(false);
+  const [showTrades, setShowTrades] = useState(false);
+  const [klineData, setKlineData] = useState<KlineDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,8 +175,12 @@ export default function PriceChart({ symbol, avgBuyPrice }: PriceChartProps) {
       lineWidth: 2,
     });
 
+    const primitive = createTradeMarkersPrimitive();
+    series.attachPrimitive(primitive);
+
     chartRef.current = chart;
     seriesRef.current = series;
+    tradesPrimitiveRef.current = primitive;
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -93,6 +195,7 @@ export default function PriceChart({ symbol, avgBuyPrice }: PriceChartProps) {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      tradesPrimitiveRef.current = null;
     };
   }, []);
 
@@ -117,6 +220,51 @@ export default function PriceChart({ symbol, avgBuyPrice }: PriceChartProps) {
     }
   }, [showAvgBuy, avgBuyPrice]);
 
+  // Manage trade markers (grouped by bar, drawn as circles with B/S inside)
+  useEffect(() => {
+    const primitive = tradesPrimitiveRef.current;
+    if (!primitive) return;
+
+    const spotTrades = transactions?.filter(
+      (tx) => tx.source === "spot" && (tx.type === "buy" || tx.type === "sell") && tx.price > 0
+    );
+
+    if (!showTrades || !spotTrades || spotTrades.length === 0 || klineData.length === 0) {
+      primitive.setTrades([]);
+      return;
+    }
+
+    const barTimes = klineData.map((d) => d.time);
+    const priceMap = new Map(klineData.map((d) => [d.time, d.value]));
+
+    const rangeStart = barTimes[0];
+    const rangeEnd = barTimes[barTimes.length - 1];
+    const barDuration = barTimes.length >= 2 ? barTimes[1] - barTimes[0] : 0;
+
+    // Group trades by nearest bar
+    const groups = new Map<number, { buys: number; sells: number }>();
+    for (const tx of spotTrades) {
+      const txSec = Math.floor(tx.date / 1000);
+      if (txSec < rangeStart - barDuration / 2 || txSec > rangeEnd + barDuration / 2) continue;
+      const snapped = snapToBar(txSec, barTimes);
+      const group = groups.get(snapped) || { buys: 0, sells: 0 };
+      if (tx.type === "buy") group.buys++;
+      else group.sells++;
+      groups.set(snapped, group);
+    }
+
+    // One marker per bar, positioned on the price line
+    const tradeMarkers: TradeMarkerData[] = Array.from(groups.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([time, { buys, sells }]) => ({
+        time: time as UTCTimestamp,
+        price: priceMap.get(time) ?? 0,
+        isBuy: buys >= sells,
+      }));
+
+    primitive.setTrades(tradeMarkers);
+  }, [showTrades, transactions, klineData]);
+
   // Fetch data when timeframe changes
   const fetchData = useCallback(async () => {
     const tf = TIMEFRAMES[activeTimeframe];
@@ -134,12 +282,13 @@ export default function PriceChart({ symbol, avgBuyPrice }: PriceChartProps) {
       const data: KlineDataPoint[] = await res.json();
 
       if (seriesRef.current && chartRef.current) {
-        // Set price precision based on data
         const minPrice = Math.min(...data.map((d) => d.value));
         const precision = getPricePrecision(minPrice);
         seriesRef.current.applyOptions({
           priceFormat: { type: "price", precision, minMove: 1 / Math.pow(10, precision) },
         });
+
+        setKlineData(data);
 
         seriesRef.current.setData(
           data.map((d) => ({ time: d.time as UTCTimestamp, value: d.value }))
@@ -171,6 +320,17 @@ export default function PriceChart({ symbol, avgBuyPrice }: PriceChartProps) {
                 className="h-3.5 w-3.5 rounded border-[#2b3139] bg-[#2b3139] accent-[#1e88e5]"
               />
               Avg Buy
+            </label>
+          )}
+          {transactions && transactions.some((tx) => tx.source === "spot" && (tx.type === "buy" || tx.type === "sell")) && (
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-[#848e9c]">
+              <input
+                type="checkbox"
+                checked={showTrades}
+                onChange={(e) => setShowTrades(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-[#2b3139] bg-[#2b3139] accent-[#0ecb81]"
+              />
+              Trades
             </label>
           )}
         </div>
