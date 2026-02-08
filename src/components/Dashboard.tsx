@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { BinanceBalance, BinanceTrade, BinanceTickerPrice, BinanceAutoInvestTransaction, BinanceAssetDividend, PortfolioData } from "@/lib/types";
 import { buildPortfolio } from "@/lib/calculations";
 import LoadingSpinner from "./LoadingSpinner";
@@ -66,6 +66,14 @@ export default function Dashboard() {
   const [rawAutoInvestByAsset, setRawAutoInvestByAsset] = useState<Record<string, BinanceAutoInvestTransaction[]>>({});
   const [rawDividendsByAsset, setRawDividendsByAsset] = useState<Record<string, BinanceAssetDividend[]>>({});
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<number | null>(null);
+  const [secondsAgo, setSecondsAgo] = useState(0);
+
+  // Cached data for price-only refresh
+  const cachedBalances = useRef<BinanceBalance[]>([]);
+  const cachedTradesBySymbol = useRef<Record<string, BinanceTrade[]>>({});
+  const cachedAutoInvestByAsset = useRef<Record<string, BinanceAutoInvestTransaction[]>>({});
+  const cachedValidSymbols = useRef<string[]>([]);
 
   const fetchPortfolio = useCallback(async () => {
     try {
@@ -176,12 +184,18 @@ export default function Dashboard() {
       }
       const prices: BinanceTickerPrice[] = await pricesRes.json();
 
+      cachedBalances.current = balances;
+      cachedTradesBySymbol.current = tradesBySymbol;
+      cachedAutoInvestByAsset.current = autoInvestByAsset;
+      cachedValidSymbols.current = validSymbols;
+
       setRawTradesBySymbol(tradesBySymbol);
       setRawAutoInvestByAsset(autoInvestByAsset);
       setRawDividendsByAsset(dividendsByAsset);
 
       const portfolioData = buildPortfolio(balances, tradesBySymbol, autoInvestByAsset, prices);
       setPortfolio(portfolioData);
+      setLastPriceUpdate(Date.now());
       setPhase("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
@@ -192,6 +206,46 @@ export default function Dashboard() {
   useEffect(() => {
     fetchPortfolio();
   }, [fetchPortfolio]);
+
+  // Lightweight price-only refresh
+  const refreshPrices = useCallback(async () => {
+    const symbols = cachedValidSymbols.current;
+    if (symbols.length === 0 || phase !== "done") return;
+
+    try {
+      const res = await fetch(`/api/prices?symbols=${symbols.join(",")}`);
+      if (!res.ok) return;
+      const prices: BinanceTickerPrice[] = await res.json();
+
+      const portfolioData = buildPortfolio(
+        cachedBalances.current,
+        cachedTradesBySymbol.current,
+        cachedAutoInvestByAsset.current,
+        prices
+      );
+      setPortfolio(portfolioData);
+      setLastPriceUpdate(Date.now());
+    } catch {
+      // silent fail for auto-refresh
+    }
+  }, [phase]);
+
+  // Auto-refresh prices every 60s
+  useEffect(() => {
+    if (phase !== "done") return;
+    const interval = setInterval(refreshPrices, 60_000);
+    return () => clearInterval(interval);
+  }, [phase, refreshPrices]);
+
+  // Tick the "seconds ago" counter
+  useEffect(() => {
+    if (!lastPriceUpdate) return;
+    setSecondsAgo(0);
+    const interval = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastPriceUpdate) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lastPriceUpdate]);
 
   const handleSelectHolding = (asset: string) => {
     setSelectedAsset(asset);
@@ -313,13 +367,25 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div>
+        <div className="flex items-center gap-4">
           <button
             onClick={fetchPortfolio}
             className="rounded-md bg-[#fcd535] px-5 py-2 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
           >
             Refresh
           </button>
+          {lastPriceUpdate && (
+            <div className="flex items-center gap-2 text-xs text-[#848e9c]">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0ecb81] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0ecb81]" />
+              </span>
+              Prices update every 60s
+              <span className="text-[#5e6673]">
+                &middot; {secondsAgo < 5 ? "just now" : `${secondsAgo}s ago`}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -334,12 +400,23 @@ export default function Dashboard() {
               {portfolio.holdings.length} asset{portfolio.holdings.length !== 1 ? "s" : ""} &middot; Total value {formatUsd(portfolio.totalCurrentValue)}
             </p>
           </div>
-          <button
-            onClick={fetchPortfolio}
-            className="rounded-md bg-[#fcd535] px-5 py-2 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={fetchPortfolio}
+              className="rounded-md bg-[#fcd535] px-5 py-2 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
+            >
+              Refresh
+            </button>
+            {lastPriceUpdate && (
+              <div className="flex items-center gap-2 text-xs text-[#848e9c]">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0ecb81] opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0ecb81]" />
+                </span>
+                {secondsAgo < 5 ? "just now" : `${secondsAgo}s ago`}
+              </div>
+            )}
+          </div>
         </div>
 
         {portfolio.holdings.length > 0 ? (
