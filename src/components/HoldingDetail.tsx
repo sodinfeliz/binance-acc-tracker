@@ -130,7 +130,7 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, dividend
       </div>
 
       {/* Price chart */}
-      <PriceChart symbol={holding.symbol} />
+      <PriceChart symbol={holding.symbol} avgBuyPrice={stats.avgBuyPrice} />
 
       {/* Date range */}
       {stats.firstTradeDate > 0 && (

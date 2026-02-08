@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { createChart, AreaSeries, ColorType } from "lightweight-charts";
-import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
+import { createChart, AreaSeries, ColorType, LineStyle } from "lightweight-charts";
+import type { IChartApi, ISeriesApi, IPriceLine, UTCTimestamp } from "lightweight-charts";
 import type { KlineDataPoint } from "@/lib/types";
 
 interface PriceChartProps {
   symbol: string;
+  avgBuyPrice?: number;
 }
 
 interface TimeframeOption {
@@ -31,11 +32,13 @@ function getPricePrecision(minPrice: number): number {
   return 8;
 }
 
-export default function PriceChart({ symbol }: PriceChartProps) {
+export default function PriceChart({ symbol, avgBuyPrice }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const priceLineRef = useRef<IPriceLine | null>(null);
   const [activeTimeframe, setActiveTimeframe] = useState(3); // default 3M
+  const [showAvgBuy, setShowAvgBuy] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +96,27 @@ export default function PriceChart({ symbol }: PriceChartProps) {
     };
   }, []);
 
+  // Manage avg buy price line
+  useEffect(() => {
+    if (!seriesRef.current) return;
+
+    if (showAvgBuy && avgBuyPrice && avgBuyPrice > 0) {
+      if (!priceLineRef.current) {
+        priceLineRef.current = seriesRef.current.createPriceLine({
+          price: avgBuyPrice,
+          color: "#1e88e5",
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: "Avg Buy",
+        });
+      }
+    } else if (priceLineRef.current) {
+      seriesRef.current.removePriceLine(priceLineRef.current);
+      priceLineRef.current = null;
+    }
+  }, [showAvgBuy, avgBuyPrice]);
+
   // Fetch data when timeframe changes
   const fetchData = useCallback(async () => {
     const tf = TIMEFRAMES[activeTimeframe];
@@ -136,7 +160,20 @@ export default function PriceChart({ symbol }: PriceChartProps) {
   return (
     <div className="rounded-xl bg-[#1e2329] p-5">
       <div className="mb-4 flex items-center justify-between">
-        <span className="text-sm font-medium text-white">Price Chart</span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-white">Price Chart</span>
+          {avgBuyPrice !== undefined && avgBuyPrice > 0 && (
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-[#848e9c]">
+              <input
+                type="checkbox"
+                checked={showAvgBuy}
+                onChange={(e) => setShowAvgBuy(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-[#2b3139] bg-[#2b3139] accent-[#1e88e5]"
+              />
+              Avg Buy
+            </label>
+          )}
+        </div>
         <div className="flex gap-1 rounded-lg bg-[#2b3139] p-1">
           {TIMEFRAMES.map((tf, i) => (
             <button
