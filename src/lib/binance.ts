@@ -172,14 +172,13 @@ export async function getAutoInvestHistory(): Promise<BinanceAutoInvestTransacti
   const allTransactions: BinanceAutoInvestTransaction[] = [];
   const now = Date.now();
 
-  // Walk backwards in 30-day windows (API limit) up to ~2 years
+  // Walk backwards in 30-day windows (API limit) back to Binance launch (Jul 2017)
   let endTime = now;
-  const earliest = now - 2 * 365 * 24 * 60 * 60 * 1000;
+  const earliest = new Date("2017-07-01").getTime();
 
   while (endTime > earliest) {
     const startTime = Math.max(endTime - THIRTY_DAYS_MS, earliest);
     let page = 1;
-    let foundAny = false;
 
     while (true) {
       const res = await signedRequest<BinanceAutoInvestResponse>(
@@ -200,13 +199,9 @@ export async function getAutoInvestHistory(): Promise<BinanceAutoInvestTransacti
         }
       }
 
-      foundAny = true;
       if (page * 100 >= res.total) break;
       page++;
     }
-
-    // If no transactions found in this window and we're far back, stop early
-    if (!foundAny && endTime < now - 6 * THIRTY_DAYS_MS) break;
 
     endTime = startTime;
   }
