@@ -5,7 +5,6 @@ import { BinanceBalance, BinanceTrade, BinanceTickerPrice, BinanceAutoInvestTran
 import { buildPortfolio } from "@/lib/calculations";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
-import SummaryCard from "./SummaryCard";
 import PortfolioTable from "./PortfolioTable";
 
 type Phase = "idle" | "account" | "earn" | "trades" | "prices" | "done";
@@ -52,12 +51,6 @@ function formatUsd(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-}
-
-function pnlColor(value: number): string {
-  if (value > 0) return "text-green-400";
-  if (value < 0) return "text-red-400";
-  return "text-zinc-400";
 }
 
 export default function Dashboard() {
@@ -116,7 +109,6 @@ export default function Dashboard() {
       const symbols = assets.map((b) => `${b.asset}USDT`);
 
       const [tradeResults, autoInvestTxs] = await Promise.all([
-        // Spot trades per symbol
         Promise.allSettled(
           symbols.map(async (symbol) => {
             const res = await fetch(`/api/trades?symbol=${symbol}`);
@@ -125,7 +117,6 @@ export default function Dashboard() {
             return { symbol, trades };
           })
         ),
-        // Auto-invest history (best-effort)
         fetch("/api/auto-invest")
           .then(async (res) => {
             if (!res.ok) return [];
@@ -143,7 +134,6 @@ export default function Dashboard() {
         }
       }
 
-      // Group auto-invest transactions by target asset
       const autoInvestByAsset: Record<string, BinanceAutoInvestTransaction[]> = {};
       for (const tx of autoInvestTxs) {
         const symbol = `${tx.targetAsset}USDT`;
@@ -179,7 +169,6 @@ export default function Dashboard() {
       }
       const prices: BinanceTickerPrice[] = await pricesRes.json();
 
-      // Step 4: Calculate portfolio
       const portfolioData = buildPortfolio(balances, tradesBySymbol, autoInvestByAsset, prices);
       setPortfolio(portfolioData);
       setPhase("done");
@@ -201,41 +190,50 @@ export default function Dashboard() {
     return <LoadingSpinner message={PHASE_MESSAGES[phase] || "Loading..."} />;
   }
 
+  const pnlColor = portfolio.totalPnL >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]";
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <SummaryCard
-          label="Total Invested"
-          value={formatUsd(portfolio.totalInvested)}
-        />
-        <SummaryCard
-          label="Current Value"
-          value={formatUsd(portfolio.totalCurrentValue)}
-        />
-        <SummaryCard
-          label="Unrealized P&L"
-          value={`${portfolio.totalPnL >= 0 ? "+" : ""}${formatUsd(portfolio.totalPnL)}`}
-          subValue={`${portfolio.totalPnLPercent >= 0 ? "+" : ""}${portfolio.totalPnLPercent.toFixed(2)}%`}
-          valueColor={pnlColor(portfolio.totalPnL)}
-        />
+    <div className="space-y-8">
+      {/* Balance overview — like Binance's "Your Estimated Balance" */}
+      <div>
+        <p className="mb-1 text-sm text-[#848e9c]">Your Estimated Balance</p>
+        <div className="flex items-baseline gap-3">
+          <span className="text-4xl font-semibold text-white">
+            {formatUsd(portfolio.totalCurrentValue)}
+          </span>
+        </div>
+        <div className="mt-2 flex items-center gap-4">
+          <span className={`text-sm ${pnlColor}`}>
+            Today&apos;s PnL&ensp;
+            {portfolio.totalPnL >= 0 ? "+" : ""}
+            {formatUsd(portfolio.totalPnL)}
+            {" "}
+            ({portfolio.totalPnLPercent >= 0 ? "+" : ""}
+            {portfolio.totalPnLPercent.toFixed(2)}%)
+          </span>
+          <span className="text-xs text-[#5e6673]">
+            Invested {formatUsd(portfolio.totalInvested)}
+          </span>
+        </div>
+
+        <div className="mt-5 flex gap-3">
+          <button
+            onClick={fetchPortfolio}
+            className="rounded-md bg-[#fcd535] px-5 py-2 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
+      {/* Holdings table */}
       {portfolio.holdings.length > 0 ? (
         <PortfolioTable holdings={portfolio.holdings} />
       ) : (
-        <p className="py-10 text-center text-zinc-500">
+        <p className="py-10 text-center text-sm text-[#848e9c]">
           No holdings found with USDT trading pairs.
         </p>
       )}
-
-      <div className="text-center">
-        <button
-          onClick={fetchPortfolio}
-          className="rounded-md bg-zinc-800 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-700"
-        >
-          Refresh
-        </button>
-      </div>
     </div>
   );
 }
