@@ -109,6 +109,18 @@ export interface UnifiedTransaction {
   feeAsset: string;
 }
 
+// Binance kline (candlestick) raw array format
+// [openTime, open, high, low, close, volume, closeTime, quoteVolume, trades, takerBuyBase, takerBuyQuote, ignore]
+export type BinanceKlineRaw = [
+  number, string, string, string, string, string,
+  number, string, number, string, string, string,
+];
+
+export interface KlineDataPoint {
+  time: number; // Unix seconds
+  value: number; // Close price
+}
+
 export interface HoldingStats {
   totalTransactions: number;
   totalBuyTransactions: number;

@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { CryptoHolding, BinanceTrade, BinanceAutoInvestTransaction, BinanceAssetDividend } from "@/lib/types";
 import { unifyTransactions, computeHoldingStats } from "@/lib/calculations";
 import CoinIcon from "./CoinIcon";
+
+const PriceChart = dynamic(() => import("./PriceChart"), { ssr: false });
 
 interface HoldingDetailProps {
   holding: CryptoHolding;
@@ -125,6 +128,9 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, dividend
           />
         )}
       </div>
+
+      {/* Price chart */}
+      <PriceChart symbol={holding.symbol} />
 
       {/* Date range */}
       {stats.firstTradeDate > 0 && (
