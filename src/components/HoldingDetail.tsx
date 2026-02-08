@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CryptoHolding, BinanceTrade, BinanceAutoInvestTransaction } from "@/lib/types";
 import { unifyTransactions, computeHoldingStats } from "@/lib/calculations";
 import CoinIcon from "./CoinIcon";
@@ -52,6 +52,16 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }
   );
 
   const stats = useMemo(() => computeHoldingStats(transactions), [transactions]);
+
+  const [sourceFilter, setSourceFilter] = useState<"all" | "spot" | "auto-invest">("all");
+
+  const filteredTransactions = useMemo(
+    () => sourceFilter === "all" ? transactions : transactions.filter((tx) => tx.source === sourceFilter),
+    [transactions, sourceFilter]
+  );
+
+  const spotCount = useMemo(() => transactions.filter((tx) => tx.source === "spot").length, [transactions]);
+  const autoInvestCount = transactions.length - spotCount;
 
   const pnlColor = holding.pnlPercent >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]";
 
@@ -112,9 +122,30 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }
 
       {/* Transaction history table */}
       <div className="rounded-xl bg-[#1e2329]">
-        <div className="px-6 py-4">
-          <span className="text-sm font-medium text-white">Transaction History</span>
-          <span className="ml-2 text-xs text-[#5e6673]">{transactions.length} transactions</span>
+        <div className="flex items-center justify-between px-6 py-4">
+          <div>
+            <span className="text-sm font-medium text-white">Transaction History</span>
+            <span className="ml-2 text-xs text-[#5e6673]">{filteredTransactions.length} transactions</span>
+          </div>
+          <div className="flex gap-1 rounded-lg bg-[#2b3139] p-1">
+            {([
+              { key: "all" as const, label: "All", count: transactions.length },
+              { key: "spot" as const, label: "Spot", count: spotCount },
+              { key: "auto-invest" as const, label: "Auto-Invest", count: autoInvestCount },
+            ]).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setSourceFilter(tab.key)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  sourceFilter === tab.key
+                    ? "bg-[#fcd535] text-[#202630]"
+                    : "text-[#848e9c] hover:text-white"
+                }`}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -130,11 +161,11 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }
               </tr>
             </thead>
             <tbody>
-              {transactions.map((tx, i) => (
+              {filteredTransactions.map((tx, i) => (
                 <tr
                   key={tx.id}
                   className={`transition-colors hover:bg-[#2b3139] ${
-                    i < transactions.length - 1 ? "border-b border-[#2b3139]" : ""
+                    i < filteredTransactions.length - 1 ? "border-b border-[#2b3139]" : ""
                   }`}
                 >
                   <td className="px-6 py-3 text-[#eaecef]">{formatDateTime(tx.date)}</td>
@@ -160,7 +191,7 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, onBack }
                   </td>
                 </tr>
               ))}
-              {transactions.length === 0 && (
+              {filteredTransactions.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-10 text-center text-[#848e9c]">
                     No transactions found
