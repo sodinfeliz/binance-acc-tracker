@@ -1,6 +1,7 @@
 "use client";
 
 import { CryptoHolding } from "@/lib/types";
+import CoinIcon from "./CoinIcon";
 
 interface PortfolioTableProps {
   holdings: CryptoHolding[];
@@ -53,11 +54,7 @@ export default function PortfolioTable({ holdings }: PortfolioTableProps) {
             >
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2b3139]">
-                    <span className="text-xs font-bold text-[#f0b90b]">
-                      {h.asset.slice(0, 1)}
-                    </span>
-                  </div>
+                  <CoinIcon asset={h.asset} />
                   <div>
                     <span className="font-medium text-white">{h.asset}</span>
                     <span className="ml-1 text-xs text-[#5e6673]">{h.asset}</span>
