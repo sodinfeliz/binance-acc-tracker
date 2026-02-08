@@ -52,7 +52,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           <path d="M18.28 12L20.14 10.14L22 12L20.14 13.86L18.28 12Z" fill="#F0B90B"/>
           <path d="M14.83 12L12 9.17L9.17 12L12 14.83L14.83 12Z" fill="#F0B90B"/>
         </svg>
-        <span className="text-base font-semibold tracking-wide text-white">BINANCE</span>
+        <span className="text-base font-semibold tracking-wide text-white">TRACKER</span>
       </div>
 
       {/* Nav items */}
