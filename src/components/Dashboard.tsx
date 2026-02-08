@@ -58,6 +58,7 @@ function formatUsd(value: number): string {
 export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
+  const [usdtBalance, setUsdtBalance] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -86,6 +87,11 @@ export default function Dashboard() {
       }
 
       const balances = mergeBalances(spotBalances, earnBalances);
+
+      // Track USDT balance
+      const usdtEntry = balances.find((b) => b.asset === "USDT");
+      setUsdtBalance(usdtEntry ? parseFloat(usdtEntry.free) + parseFloat(usdtEntry.locked) : 0);
+
       const assets = balances.filter(
         (b) => b.asset !== "USDT" && b.asset !== "USDC" && b.asset !== "BUSD"
       );
@@ -199,7 +205,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="rounded-xl bg-[#1e2329] p-5">
             <p className="text-xs text-[#848e9c]">Total Assets</p>
             <p className="mt-1 text-xl font-semibold text-white">{portfolio.holdings.length}</p>
@@ -213,6 +219,10 @@ export default function Dashboard() {
             <p className={`mt-1 text-xl font-semibold ${pnlColor}`}>
               {portfolio.totalPnL >= 0 ? "+" : ""}{formatUsd(portfolio.totalPnL)}
             </p>
+          </div>
+          <div className="rounded-xl bg-[#1e2329] p-5">
+            <p className="text-xs text-[#848e9c]">USDT Balance</p>
+            <p className="mt-1 text-xl font-semibold text-white">{formatUsd(usdtBalance)}</p>
           </div>
         </div>
 
