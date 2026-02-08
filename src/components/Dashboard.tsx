@@ -6,6 +6,8 @@ import { buildPortfolio } from "@/lib/calculations";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
 import PortfolioTable from "./PortfolioTable";
+import Sidebar from "./Sidebar";
+import CoinIcon from "./CoinIcon";
 
 type Phase = "idle" | "account" | "earn" | "trades" | "prices" | "done";
 
@@ -57,13 +59,13 @@ export default function Dashboard() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
   const fetchPortfolio = useCallback(async () => {
     try {
       setError(null);
       setPortfolio(null);
 
-      // Step 1: Fetch spot balances
       setPhase("account");
       const balancesRes = await fetch("/api/account");
       if (!balancesRes.ok) {
@@ -72,7 +74,6 @@ export default function Dashboard() {
       }
       const spotBalances: BinanceBalance[] = await balancesRes.json();
 
-      // Step 1b: Fetch earn positions
       setPhase("earn");
       let earnBalances: BinanceBalance[] = [];
       try {
@@ -81,30 +82,20 @@ export default function Dashboard() {
           earnBalances = await earnRes.json();
         }
       } catch {
-        // Earn fetch is best-effort — continue with spot only
+        // best-effort
       }
 
-      // Merge spot + earn balances
       const balances = mergeBalances(spotBalances, earnBalances);
-
-      // Filter to assets that might have USDT pairs (exclude USDT and stablecoins)
       const assets = balances.filter(
         (b) => b.asset !== "USDT" && b.asset !== "USDC" && b.asset !== "BUSD"
       );
 
       if (assets.length === 0) {
-        setPortfolio({
-          holdings: [],
-          totalInvested: 0,
-          totalCurrentValue: 0,
-          totalPnL: 0,
-          totalPnLPercent: 0,
-        });
+        setPortfolio({ holdings: [], totalInvested: 0, totalCurrentValue: 0, totalPnL: 0, totalPnLPercent: 0 });
         setPhase("done");
         return;
       }
 
-      // Step 2: Fetch trades + auto-invest history in parallel
       setPhase("trades");
       const symbols = assets.map((b) => `${b.asset}USDT`);
 
@@ -146,23 +137,14 @@ export default function Dashboard() {
         autoInvestByAsset[tx.targetAsset].push(tx);
       }
 
-      // Step 3: Fetch current prices
       setPhase("prices");
       if (validSymbols.length === 0) {
-        setPortfolio({
-          holdings: [],
-          totalInvested: 0,
-          totalCurrentValue: 0,
-          totalPnL: 0,
-          totalPnLPercent: 0,
-        });
+        setPortfolio({ holdings: [], totalInvested: 0, totalCurrentValue: 0, totalPnL: 0, totalPnLPercent: 0 });
         setPhase("done");
         return;
       }
 
-      const pricesRes = await fetch(
-        `/api/prices?symbols=${validSymbols.join(",")}`
-      );
+      const pricesRes = await fetch(`/api/prices?symbols=${validSymbols.join(",")}`);
       if (!pricesRes.ok) {
         const body = await pricesRes.json();
         throw new Error(body.error || "Failed to fetch prices");
@@ -182,41 +164,96 @@ export default function Dashboard() {
     fetchPortfolio();
   }, [fetchPortfolio]);
 
+  const pnlColor = portfolio && portfolio.totalPnL >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]";
+
+  // Main content based on loading state
+  let content;
   if (error) {
-    return <ErrorMessage message={error} onRetry={fetchPortfolio} />;
-  }
+    content = <ErrorMessage message={error} onRetry={fetchPortfolio} />;
+  } else if (phase !== "done" || !portfolio) {
+    content = <LoadingSpinner message={PHASE_MESSAGES[phase] || "Loading..."} />;
+  } else if (activeTab === "overview") {
+    // Top 5 holdings for the overview grid
+    const topHoldings = portfolio.holdings.slice(0, 5);
 
-  if (phase !== "done" || !portfolio) {
-    return <LoadingSpinner message={PHASE_MESSAGES[phase] || "Loading..."} />;
-  }
-
-  const pnlColor = portfolio.totalPnL >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]";
-
-  return (
-    <div className="space-y-8">
-      {/* Balance overview — like Binance's "Your Estimated Balance" */}
-      <div>
-        <p className="mb-1 text-sm text-[#848e9c]">Your Estimated Balance</p>
-        <div className="flex items-baseline gap-3">
+    content = (
+      <div className="space-y-8">
+        {/* Balance header */}
+        <div>
+          <p className="mb-1 text-sm text-[#848e9c]">Your Estimated Balance</p>
           <span className="text-4xl font-semibold text-white">
             {formatUsd(portfolio.totalCurrentValue)}
           </span>
-        </div>
-        <div className="mt-2 flex items-center gap-4">
-          <span className={`text-sm ${pnlColor}`}>
-            Today&apos;s PnL&ensp;
-            {portfolio.totalPnL >= 0 ? "+" : ""}
-            {formatUsd(portfolio.totalPnL)}
-            {" "}
-            ({portfolio.totalPnLPercent >= 0 ? "+" : ""}
-            {portfolio.totalPnLPercent.toFixed(2)}%)
-          </span>
-          <span className="text-xs text-[#5e6673]">
-            Invested {formatUsd(portfolio.totalInvested)}
-          </span>
+          <div className="mt-2 flex items-center gap-4">
+            <span className={`text-sm ${pnlColor}`}>
+              PnL&ensp;
+              {portfolio.totalPnL >= 0 ? "+" : ""}
+              {formatUsd(portfolio.totalPnL)}
+              {" "}({portfolio.totalPnLPercent >= 0 ? "+" : ""}
+              {portfolio.totalPnLPercent.toFixed(2)}%)
+            </span>
+            <span className="text-xs text-[#5e6673]">
+              Invested {formatUsd(portfolio.totalInvested)}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-5 flex gap-3">
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-xl bg-[#1e2329] p-5">
+            <p className="text-xs text-[#848e9c]">Total Assets</p>
+            <p className="mt-1 text-xl font-semibold text-white">{portfolio.holdings.length}</p>
+          </div>
+          <div className="rounded-xl bg-[#1e2329] p-5">
+            <p className="text-xs text-[#848e9c]">Total Invested</p>
+            <p className="mt-1 text-xl font-semibold text-white">{formatUsd(portfolio.totalInvested)}</p>
+          </div>
+          <div className="rounded-xl bg-[#1e2329] p-5">
+            <p className="text-xs text-[#848e9c]">Unrealized PNL</p>
+            <p className={`mt-1 text-xl font-semibold ${pnlColor}`}>
+              {portfolio.totalPnL >= 0 ? "+" : ""}{formatUsd(portfolio.totalPnL)}
+            </p>
+          </div>
+        </div>
+
+        {/* Top holdings card */}
+        <div className="rounded-xl bg-[#1e2329]">
+          <div className="flex items-center justify-between px-6 py-4">
+            <span className="text-sm font-medium text-white">Top Holdings</span>
+            <button
+              onClick={() => setActiveTab("holdings")}
+              className="text-xs text-[#f0b90b] transition-colors hover:text-[#fcd535]"
+            >
+              View All &gt;
+            </button>
+          </div>
+          <div>
+            {topHoldings.map((h, i) => (
+              <div
+                key={h.asset}
+                className={`flex items-center justify-between px-6 py-3.5 transition-colors hover:bg-[#2b3139] ${
+                  i < topHoldings.length - 1 ? "border-b border-[#2b3139]" : ""
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <CoinIcon asset={h.asset} size={36} />
+                  <div>
+                    <span className="font-medium text-white">{h.asset}</span>
+                    <p className="text-xs text-[#5e6673]">{formatUsd(h.currentPrice)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium text-white">{formatUsd(h.currentValue)}</p>
+                  <p className={`text-xs ${h.pnlPercent >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>
+                    {h.pnlPercent >= 0 ? "+" : ""}{h.pnlPercent.toFixed(2)}%
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
           <button
             onClick={fetchPortfolio}
             className="rounded-md bg-[#fcd535] px-5 py-2 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
@@ -225,15 +262,43 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+    );
+  } else {
+    // Holdings tab
+    content = (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-medium text-white">All Holdings</h2>
+            <p className="text-xs text-[#848e9c]">
+              {portfolio.holdings.length} asset{portfolio.holdings.length !== 1 ? "s" : ""} &middot; Total value {formatUsd(portfolio.totalCurrentValue)}
+            </p>
+          </div>
+          <button
+            onClick={fetchPortfolio}
+            className="rounded-md bg-[#fcd535] px-5 py-2 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
+          >
+            Refresh
+          </button>
+        </div>
 
-      {/* Holdings table */}
-      {portfolio.holdings.length > 0 ? (
-        <PortfolioTable holdings={portfolio.holdings} />
-      ) : (
-        <p className="py-10 text-center text-sm text-[#848e9c]">
-          No holdings found with USDT trading pairs.
-        </p>
-      )}
+        {portfolio.holdings.length > 0 ? (
+          <PortfolioTable holdings={portfolio.holdings} />
+        ) : (
+          <p className="py-10 text-center text-sm text-[#848e9c]">
+            No holdings found with USDT trading pairs.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="ml-60 flex-1 px-8 py-8">
+        {content}
+      </main>
     </div>
   );
 }
