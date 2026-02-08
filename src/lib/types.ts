@@ -47,6 +47,25 @@ export interface BinanceEarnResponse<T> {
   total: number;
 }
 
+export interface BinanceAutoInvestTransaction {
+  id: number;
+  targetAsset: string;
+  planType: string;
+  sourceAsset: string;
+  sourceAssetAmount: string;
+  targetAssetAmount: string;
+  transactionDateTime: number;
+  transactionStatus: string;
+  transactionFee: string;
+  transactionFeeUnit: string;
+  executionPrice: string;
+}
+
+export interface BinanceAutoInvestResponse {
+  total: number;
+  list: BinanceAutoInvestTransaction[];
+}
+
 // App types
 
 export interface CryptoHolding {

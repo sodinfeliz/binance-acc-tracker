@@ -2,6 +2,7 @@ import {
   BinanceTrade,
   BinanceTickerPrice,
   BinanceBalance,
+  BinanceAutoInvestTransaction,
   CryptoHolding,
   PortfolioData,
 } from "./types";
@@ -10,12 +11,14 @@ export function calculateHolding(
   asset: string,
   symbol: string,
   trades: BinanceTrade[],
+  autoInvestTxs: BinanceAutoInvestTransaction[],
   currentPrice: number,
   balance: BinanceBalance
 ): CryptoHolding {
   let totalQtyBought = 0;
   let totalCostUsdt = 0;
 
+  // Regular spot trades
   for (const trade of trades) {
     if (!trade.isBuyer) continue;
 
@@ -28,15 +31,28 @@ export function calculateHolding(
 
     // Commission handling
     if (trade.commissionAsset === asset) {
-      // Commission paid in base asset — reduces quantity received
       effectiveQty -= commission;
     } else if (trade.commissionAsset === "USDT") {
-      // Commission paid in quote asset — adds to cost
       effectiveCost += commission;
     }
-    // If commission paid in BNB or other asset, no adjustment needed
 
     totalQtyBought += effectiveQty;
+    totalCostUsdt += effectiveCost;
+  }
+
+  // Auto-invest / Index-Linked Plan transactions
+  for (const tx of autoInvestTxs) {
+    const qty = parseFloat(tx.targetAssetAmount);
+    const cost = parseFloat(tx.sourceAssetAmount);
+    const fee = parseFloat(tx.transactionFee);
+
+    let effectiveCost = cost;
+    // If fee is in the same currency as source (USDT/BUSD), add to cost
+    if (tx.transactionFeeUnit === tx.sourceAsset) {
+      effectiveCost += fee;
+    }
+
+    totalQtyBought += qty;
     totalCostUsdt += effectiveCost;
   }
 
@@ -63,6 +79,7 @@ export function calculateHolding(
 export function buildPortfolio(
   balances: BinanceBalance[],
   tradesBySymbol: Record<string, BinanceTrade[]>,
+  autoInvestByAsset: Record<string, BinanceAutoInvestTransaction[]>,
   prices: BinanceTickerPrice[]
 ): PortfolioData {
   const priceMap = new Map<string, number>();
@@ -81,15 +98,14 @@ export function buildPortfolio(
     if (currentPrice === undefined) continue;
 
     const trades = tradesBySymbol[symbol] || [];
-    const holding = calculateHolding(asset, symbol, trades, currentPrice, balance);
+    const autoInvestTxs = autoInvestByAsset[asset] || [];
+    const holding = calculateHolding(asset, symbol, trades, autoInvestTxs, currentPrice, balance);
 
-    // Only include holdings with meaningful value (> $1)
     if (holding.currentValue > 1) {
       holdings.push(holding);
     }
   }
 
-  // Sort by current value descending
   holdings.sort((a, b) => b.currentValue - a.currentValue);
 
   const totalInvested = holdings.reduce((sum, h) => sum + h.totalInvested, 0);

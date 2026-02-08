@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { BinanceBalance, BinanceTrade, BinanceTickerPrice, PortfolioData } from "@/lib/types";
+import { BinanceBalance, BinanceTrade, BinanceTickerPrice, BinanceAutoInvestTransaction, PortfolioData } from "@/lib/types";
 import { buildPortfolio } from "@/lib/calculations";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
@@ -111,17 +111,28 @@ export default function Dashboard() {
         return;
       }
 
-      // Step 2: Fetch trades for each symbol in parallel
+      // Step 2: Fetch trades + auto-invest history in parallel
       setPhase("trades");
       const symbols = assets.map((b) => `${b.asset}USDT`);
-      const tradeResults = await Promise.allSettled(
-        symbols.map(async (symbol) => {
-          const res = await fetch(`/api/trades?symbol=${symbol}`);
-          if (!res.ok) throw new Error(`Failed for ${symbol}`);
-          const trades: BinanceTrade[] = await res.json();
-          return { symbol, trades };
-        })
-      );
+
+      const [tradeResults, autoInvestTxs] = await Promise.all([
+        // Spot trades per symbol
+        Promise.allSettled(
+          symbols.map(async (symbol) => {
+            const res = await fetch(`/api/trades?symbol=${symbol}`);
+            if (!res.ok) throw new Error(`Failed for ${symbol}`);
+            const trades: BinanceTrade[] = await res.json();
+            return { symbol, trades };
+          })
+        ),
+        // Auto-invest history (best-effort)
+        fetch("/api/auto-invest")
+          .then(async (res) => {
+            if (!res.ok) return [];
+            return (await res.json()) as BinanceAutoInvestTransaction[];
+          })
+          .catch(() => [] as BinanceAutoInvestTransaction[]),
+      ]);
 
       const tradesBySymbol: Record<string, BinanceTrade[]> = {};
       const validSymbols: string[] = [];
@@ -130,6 +141,19 @@ export default function Dashboard() {
           tradesBySymbol[result.value.symbol] = result.value.trades;
           validSymbols.push(result.value.symbol);
         }
+      }
+
+      // Group auto-invest transactions by target asset
+      const autoInvestByAsset: Record<string, BinanceAutoInvestTransaction[]> = {};
+      for (const tx of autoInvestTxs) {
+        const symbol = `${tx.targetAsset}USDT`;
+        if (!validSymbols.includes(symbol)) {
+          validSymbols.push(symbol);
+        }
+        if (!autoInvestByAsset[tx.targetAsset]) {
+          autoInvestByAsset[tx.targetAsset] = [];
+        }
+        autoInvestByAsset[tx.targetAsset].push(tx);
       }
 
       // Step 3: Fetch current prices
@@ -156,7 +180,7 @@ export default function Dashboard() {
       const prices: BinanceTickerPrice[] = await pricesRes.json();
 
       // Step 4: Calculate portfolio
-      const portfolioData = buildPortfolio(balances, tradesBySymbol, prices);
+      const portfolioData = buildPortfolio(balances, tradesBySymbol, autoInvestByAsset, prices);
       setPortfolio(portfolioData);
       setPhase("done");
     } catch (err) {

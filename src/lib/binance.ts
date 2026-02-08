@@ -7,6 +7,8 @@ import {
   BinanceFlexiblePosition,
   BinanceLockedPosition,
   BinanceEarnResponse,
+  BinanceAutoInvestTransaction,
+  BinanceAutoInvestResponse,
 } from "./types";
 
 const BASE_URL = "https://api.binance.com";
@@ -162,6 +164,54 @@ export async function getEarnBalances(): Promise<BinanceBalance[]> {
     free: amount.toString(),
     locked: "0",
   }));
+}
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function getAutoInvestHistory(): Promise<BinanceAutoInvestTransaction[]> {
+  const allTransactions: BinanceAutoInvestTransaction[] = [];
+  const now = Date.now();
+
+  // Walk backwards in 30-day windows (API limit) up to ~2 years
+  let endTime = now;
+  const earliest = now - 2 * 365 * 24 * 60 * 60 * 1000;
+
+  while (endTime > earliest) {
+    const startTime = Math.max(endTime - THIRTY_DAYS_MS, earliest);
+    let page = 1;
+    let foundAny = false;
+
+    while (true) {
+      const res = await signedRequest<BinanceAutoInvestResponse>(
+        "/sapi/v1/lending/auto-invest/history/list",
+        {
+          startTime: startTime.toString(),
+          endTime: endTime.toString(),
+          size: "100",
+          current: page.toString(),
+        }
+      );
+
+      if (!res.list || res.list.length === 0) break;
+
+      for (const tx of res.list) {
+        if (tx.transactionStatus === "SUCCESS") {
+          allTransactions.push(tx);
+        }
+      }
+
+      foundAny = true;
+      if (page * 100 >= res.total) break;
+      page++;
+    }
+
+    // If no transactions found in this window and we're far back, stop early
+    if (!foundAny && endTime < now - 6 * THIRTY_DAYS_MS) break;
+
+    endTime = startTime;
+  }
+
+  return allTransactions;
 }
 
 export async function getCurrentPrices(
