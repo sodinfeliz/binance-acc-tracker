@@ -69,63 +69,68 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, dividend
   const autoInvestCount = useMemo(() => transactions.filter((tx) => tx.source === "auto-invest").length, [transactions]);
   const earnCount = useMemo(() => transactions.filter((tx) => tx.source === "earn").length, [transactions]);
 
-  const pnlColor = holding.pnlPercent >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]";
+  const pnlColor = holding.pnlPercent >= 0 ? "text-up" : "text-down";
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2b3139] text-[#848e9c] transition-colors hover:bg-[#3b4149] hover:text-white"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <CoinIcon asset={holding.asset} size={40} />
-        <div>
+    <div className="space-y-3">
+      {/* Instrument readout */}
+      <div className="panel">
+        <div className="panel-title">
+          <button onClick={onBack} className="tracking-[0.15em] text-ink-2 transition-colors hover:text-amber">
+            [ESC] BACK
+          </button>
+          <span className="text-ink-3">INSTRUMENT: {holding.symbol}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 p-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-semibold text-white">{holding.asset}</h2>
-            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${holding.pnlPercent >= 0 ? "bg-[#0ecb81]/15 text-[#0ecb81]" : "bg-[#f6465d]/15 text-[#f6465d]"}`}>
-              {holding.pnlPercent >= 0 ? "+" : ""}{holding.pnlPercent.toFixed(2)}%
+            <CoinIcon asset={holding.asset} size={28} />
+            <span className="text-2xl font-bold tracking-tight text-ink">{holding.asset}</span>
+            <span className={`text-[13px] ${pnlColor}`}>
+              {holding.pnlPercent >= 0 ? "▲ +" : "▼ "}{holding.pnlPercent.toFixed(2)}%
             </span>
           </div>
-          <p className="text-sm text-[#848e9c]">
-            {formatUsd(holding.currentPrice)} &middot; {formatQty(holding.quantity)} {holding.asset}
-          </p>
-        </div>
-        <div className="ml-auto text-right">
-          <p className="text-xl font-semibold text-white">{formatUsd(holding.currentValue)}</p>
-          <p className={`text-sm ${pnlColor}`}>
-            {holding.unrealizedPnL >= 0 ? "+" : ""}{formatUsd(holding.unrealizedPnL)}
-          </p>
+          <div className="text-[13px]">
+            <span className="text-ink-3">LAST </span>
+            <span className="text-ink">{formatUsd(holding.currentPrice)}</span>
+          </div>
+          <div className="text-[13px]">
+            <span className="text-ink-3">QTY </span>
+            <span className="text-ink">{formatQty(holding.quantity)}</span>
+          </div>
+          <div className="ml-auto text-right text-[13px]">
+            <span className="text-ink-3">VALUE </span>
+            <span className="text-lg font-bold text-ink">{formatUsd(holding.currentValue)}</span>
+            <span className={`ml-3 ${pnlColor}`}>
+              {holding.unrealizedPnL >= 0 ? "+" : ""}{formatUsd(holding.unrealizedPnL)}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Avg Buy Price" value={formatUsd(stats.avgBuyPrice)} />
-        <StatCard label="Total Invested" value={formatUsd(stats.totalCostBasis)} />
-        <StatCard
-          label="Transactions"
+      {/* Stat grid */}
+      <div className="grid grid-cols-2 gap-px border border-grid bg-grid md:grid-cols-4">
+        <StatCell label="AVG BUY" value={formatUsd(stats.avgBuyPrice)} />
+        <StatCell label="INVESTED" value={formatUsd(stats.totalCostBasis)} />
+        <StatCell
+          label="TXNS"
           value={stats.totalTransactions.toString()}
-          sub={`${stats.totalBuyTransactions} buy / ${stats.totalSellTransactions} sell`}
+          sub={`${stats.totalBuyTransactions} BUY / ${stats.totalSellTransactions} SELL`}
         />
-        <StatCard label="Total Fees" value={formatUsd(stats.totalFeesPaid)} />
-        <StatCard
-          label="Entry Range"
+        <StatCell label="FEES" value={formatUsd(stats.totalFeesPaid)} />
+        <StatCell
+          label="ENTRY RANGE"
           value={`${formatUsd(stats.lowestBuyPrice)} – ${formatUsd(stats.highestBuyPrice)}`}
-          sub="Low – High"
         />
-        <StatCard label="Total Bought" value={formatQty(stats.totalBought)} />
-        <StatCard label="Total Sold" value={formatQty(stats.totalSold)} />
-        {stats.totalRewards > 0 && (
-          <StatCard
-            label="Earn Rewards"
+        <StatCell label="BOUGHT" value={formatQty(stats.totalBought)} />
+        <StatCell label="SOLD" value={formatQty(stats.totalSold)} />
+        {stats.totalRewards > 0 ? (
+          <StatCell
+            label="EARN RWD"
             value={formatQty(stats.totalRewards)}
-            sub={`~${formatUsd(stats.totalRewards * holding.currentPrice)} (${stats.totalRewardTransactions} distributions)`}
+            sub={`~${formatUsd(stats.totalRewards * holding.currentPrice)} · ${stats.totalRewardTransactions} DISTR`}
           />
+        ) : (
+          <StatCell label="EARN RWD" value="—" />
         )}
       </div>
 
@@ -134,91 +139,90 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, dividend
 
       {/* Date range */}
       {stats.firstTradeDate > 0 && (
-        <p className="text-xs text-[#5e6673]">
-          Trading since {formatDate(stats.firstTradeDate)} &middot; Last trade {formatDate(stats.lastTradeDate)}
+        <p className="text-[11px] tracking-[0.1em] text-ink-3">
+          FIRST TRADE {formatDate(stats.firstTradeDate).toUpperCase()} · LAST TRADE {formatDate(stats.lastTradeDate).toUpperCase()}
         </p>
       )}
 
-      {/* Transaction history table */}
-      <div className="rounded-xl bg-[#1e2329]">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div>
-            <span className="text-sm font-medium text-white">Transaction History</span>
-            <span className="ml-2 text-xs text-[#5e6673]">{filteredTransactions.length} transactions</span>
-          </div>
-          <div className="flex gap-1 rounded-lg bg-[#2b3139] p-1">
+      {/* Transaction history */}
+      <div className="panel">
+        <div className="panel-title">
+          <span>
+            Transactions <span className="text-ink-3">/ {filteredTransactions.length}</span>
+          </span>
+          <div className="flex normal-case tracking-normal">
             {([
-              { key: "all" as const, label: "All", count: transactions.length },
-              { key: "spot" as const, label: "Spot", count: spotCount },
-              { key: "auto-invest" as const, label: "Auto-Invest", count: autoInvestCount },
-              { key: "earn" as const, label: "Earn", count: earnCount },
+              { key: "all" as const, label: "ALL", count: transactions.length },
+              { key: "spot" as const, label: "SPOT", count: spotCount },
+              { key: "auto-invest" as const, label: "AUTO", count: autoInvestCount },
+              { key: "earn" as const, label: "EARN", count: earnCount },
             ]).map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setSourceFilter(tab.key)}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                className={`border border-l-0 border-grid px-2.5 py-1 text-[11px] first:border-l transition-colors ${
                   sourceFilter === tab.key
-                    ? "bg-[#fcd535] text-[#202630]"
-                    : "text-[#848e9c] hover:text-white"
+                    ? "bg-amber text-bg"
+                    : "text-ink-2 hover:bg-panel-2 hover:text-ink"
                 }`}
               >
-                {tab.label} ({tab.count})
+                {tab.label}:{tab.count}
               </button>
             ))}
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-[13px]">
             <thead>
-              <tr className="text-left text-xs text-[#848e9c]">
-                <th className="px-6 py-3 font-normal">Date</th>
-                <th className="px-4 py-3 font-normal">Type</th>
-                <th className="px-4 py-3 font-normal">Source</th>
-                <th className="px-4 py-3 text-right font-normal">Price</th>
-                <th className="px-4 py-3 text-right font-normal">Quantity</th>
-                <th className="px-4 py-3 text-right font-normal">Total</th>
-                <th className="px-6 py-3 text-right font-normal">Fee</th>
+              <tr className="border-b border-grid text-left text-[11px] tracking-[0.15em] text-ink-3">
+                <th className="px-3 py-2 font-normal">DATE</th>
+                <th className="px-3 py-2 font-normal">TYPE</th>
+                <th className="px-3 py-2 font-normal">SRC</th>
+                <th className="px-3 py-2 text-right font-normal">PRICE</th>
+                <th className="px-3 py-2 text-right font-normal">QTY</th>
+                <th className="px-3 py-2 text-right font-normal">TOTAL</th>
+                <th className="px-3 py-2 text-right font-normal">FEE</th>
               </tr>
             </thead>
             <tbody>
               {filteredTransactions.map((tx, i) => (
                 <tr
                   key={tx.id}
-                  className={`transition-colors hover:bg-[#2b3139] ${
-                    i < filteredTransactions.length - 1 ? "border-b border-[#2b3139]" : ""
+                  className={`transition-colors hover:bg-panel-2 ${
+                    i < filteredTransactions.length - 1 ? "border-b border-grid/60" : ""
                   }`}
                 >
-                  <td className="px-6 py-3 text-[#eaecef]">{formatDateTime(tx.date)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium ${
-                      tx.type === "buy" ? "text-[#0ecb81]" : tx.type === "reward" ? "text-[#1e88e5]" : "text-[#f6465d]"
-                    }`}>
-                      {tx.type === "buy" ? "Buy" : tx.type === "reward" ? "Reward" : "Sell"}
+                  <td className="px-3 py-2 text-ink-2">{formatDateTime(tx.date)}</td>
+                  <td className="px-3 py-2">
+                    <span className={
+                      tx.type === "buy" ? "text-up" : tx.type === "reward" ? "text-cyan" : "text-down"
+                    }>
+                      {tx.type === "buy" ? "[BUY]" : tx.type === "reward" ? "[RWD]" : "[SELL]"}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded px-1.5 py-0.5 text-xs ${
+                  <td className="px-3 py-2">
+                    <span className={
                       tx.source === "spot"
-                        ? "bg-[#f0b90b]/15 text-[#f0b90b]"
+                        ? "text-amber"
                         : tx.source === "earn"
-                        ? "bg-[#0ecb81]/15 text-[#0ecb81]"
-                        : "bg-[#1e88e5]/15 text-[#1e88e5]"
-                    }`}>
-                      {tx.source === "spot" ? "Spot" : tx.source === "earn" ? "Earn" : "Auto-Invest"}
+                        ? "text-up"
+                        : "text-cyan"
+                    }>
+                      {tx.source === "spot" ? "SPOT" : tx.source === "earn" ? "EARN" : "AUTO"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right text-[#eaecef]">{tx.price > 0 ? formatUsd(tx.price) : "-"}</td>
-                  <td className="px-4 py-3 text-right text-[#eaecef]">{formatQty(tx.quantity)}</td>
-                  <td className="px-4 py-3 text-right text-[#eaecef]">{tx.quoteAmount > 0 ? formatUsd(tx.quoteAmount) : "-"}</td>
-                  <td className="px-6 py-3 text-right text-[#5e6673]">
-                    {tx.fee > 0 ? `${formatQty(tx.fee)} ${tx.feeAsset}` : "-"}
+                  <td className="px-3 py-2 text-right text-ink-2">{tx.price > 0 ? formatUsd(tx.price) : "—"}</td>
+                  <td className="px-3 py-2 text-right text-ink-2">{formatQty(tx.quantity)}</td>
+                  <td className="px-3 py-2 text-right text-ink">{tx.quoteAmount > 0 ? formatUsd(tx.quoteAmount) : "—"}</td>
+                  <td className="px-3 py-2 text-right text-ink-3">
+                    {tx.fee > 0 ? `${formatQty(tx.fee)} ${tx.feeAsset}` : "—"}
                   </td>
                 </tr>
               ))}
               {filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-[#848e9c]">
-                    No transactions found
+                  <td colSpan={7} className="px-3 py-10 text-center text-ink-2">
+                    NO TRANSACTIONS FOUND
                   </td>
                 </tr>
               )}
@@ -230,12 +234,12 @@ export default function HoldingDetail({ holding, trades, autoInvestTxs, dividend
   );
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl bg-[#1e2329] p-5">
-      <p className="text-xs text-[#848e9c]">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-[#5e6673]">{sub}</p>}
+    <div className="bg-panel p-4">
+      <p className="text-[11px] tracking-[0.2em] text-ink-3">{label}</p>
+      <p className="mt-2 text-[15px] text-ink">{value}</p>
+      {sub && <p className="mt-1 text-[11px] text-ink-3">{sub}</p>}
     </div>
   );
 }

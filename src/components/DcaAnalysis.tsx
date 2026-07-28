@@ -71,64 +71,58 @@ export default function DcaAnalysis({
   }, [portfolio, rawTradesBySymbol, rawAutoInvestByAsset, rawDividendsByAsset]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium text-white">DCA Analysis</h2>
-        <p className="text-xs text-[#848e9c]">
-          Cost basis analysis based on spot buy transactions
-        </p>
+    <div className="panel">
+      <div className="panel-title">
+        <span>DCA Analysis</span>
+        <span className="text-ink-3">COST BASIS · SPOT BUYS</span>
       </div>
 
       {rows.length > 0 ? (
-        <div className="rounded-xl bg-[#1e2329]">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-[#848e9c]">
-                  <th className="px-6 py-4 font-normal">Asset</th>
-                  <th className="px-4 py-4 text-right font-normal"># Buys</th>
-                  <th className="px-4 py-4 text-right font-normal">Total Invested</th>
-                  <th className="px-4 py-4 text-right font-normal">Avg Cost</th>
-                  <th className="px-4 py-4 text-right font-normal">Current Price</th>
-                  <th className="px-6 py-4 text-right font-normal">DCA P&amp;L</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-grid text-left text-[11px] tracking-[0.15em] text-ink-3">
+                <th className="px-3 py-2 font-normal">#</th>
+                <th className="px-3 py-2 font-normal">SYM</th>
+                <th className="px-3 py-2 text-right font-normal">BUYS</th>
+                <th className="px-3 py-2 text-right font-normal">INVESTED</th>
+                <th className="px-3 py-2 text-right font-normal">AVG COST</th>
+                <th className="px-3 py-2 text-right font-normal">LAST</th>
+                <th className="px-3 py-2 text-right font-normal">DCA PNL%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr
+                  key={row.asset}
+                  onClick={() => onSelectAsset(row.asset)}
+                  className={`cursor-pointer transition-colors hover:bg-panel-2 ${
+                    i < rows.length - 1 ? "border-b border-grid/60" : ""
+                  }`}
+                >
+                  <td className="px-3 py-2.5 text-ink-3">{String(i + 1).padStart(2, "0")}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <CoinIcon asset={row.asset} size={20} />
+                      <span className="font-bold text-ink">{row.asset}</span>
+                      <span className="text-[11px] text-ink-3">{row.symbol}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-ink-2">{row.numBuys}</td>
+                  <td className="px-3 py-2.5 text-right text-ink-2">{formatUsd(row.totalInvested)}</td>
+                  <td className="px-3 py-2.5 text-right text-ink-2">{formatUsd(row.avgCost)}</td>
+                  <td className="px-3 py-2.5 text-right text-ink-2">{formatUsd(row.currentPrice)}</td>
+                  <td className={`px-3 py-2.5 text-right ${row.pnlPercent >= 0 ? "text-up" : "text-down"}`}>
+                    {row.pnlPercent >= 0 ? "+" : ""}{row.pnlPercent.toFixed(2)}%
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, i) => (
-                  <tr
-                    key={row.asset}
-                    onClick={() => onSelectAsset(row.asset)}
-                    className={`cursor-pointer transition-colors hover:bg-[#2b3139] ${
-                      i < rows.length - 1 ? "border-b border-[#2b3139]" : ""
-                    }`}
-                  >
-                    <td className="px-6 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <CoinIcon asset={row.asset} size={32} />
-                        <div>
-                          <span className="font-medium text-white">{row.asset}</span>
-                          <p className="text-xs text-[#5e6673]">{row.symbol}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-right text-[#eaecef]">{row.numBuys}</td>
-                    <td className="px-4 py-3.5 text-right text-[#eaecef]">{formatUsd(row.totalInvested)}</td>
-                    <td className="px-4 py-3.5 text-right text-[#eaecef]">{formatUsd(row.avgCost)}</td>
-                    <td className="px-4 py-3.5 text-right text-[#eaecef]">{formatUsd(row.currentPrice)}</td>
-                    <td className="px-6 py-3.5 text-right">
-                      <span className={`text-sm font-medium ${row.pnlPercent >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>
-                        {row.pnlPercent >= 0 ? "+" : ""}{row.pnlPercent.toFixed(2)}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
-        <p className="py-10 text-center text-sm text-[#848e9c]">
-          No spot buy transactions found.
+        <p className="px-3 py-10 text-center text-[13px] text-ink-2">
+          NO SPOT BUY TRANSACTIONS FOUND.
         </p>
       )}
     </div>

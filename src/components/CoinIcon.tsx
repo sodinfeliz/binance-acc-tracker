@@ -15,10 +15,10 @@ export default function CoinIcon({ asset, size = 32 }: CoinIconProps) {
   if (failed) {
     return (
       <div
-        className="flex items-center justify-center rounded-full bg-[#2b3139]"
+        className="flex items-center justify-center rounded-sm border border-grid bg-panel-2"
         style={{ width: size, height: size }}
       >
-        <span className="text-xs font-bold text-[#f0b90b]">
+        <span className="text-[10px] font-bold text-amber">
           {asset.slice(0, 1)}
         </span>
       </div>
@@ -31,7 +31,7 @@ export default function CoinIcon({ asset, size = 32 }: CoinIconProps) {
       alt={asset}
       width={size}
       height={size}
-      className="rounded-full"
+      className="rounded-sm"
       onError={() => setFailed(true)}
     />
   );

@@ -7,14 +7,21 @@ interface ErrorMessageProps {
 
 export default function ErrorMessage({ message, onRetry }: ErrorMessageProps) {
   return (
-    <div className="mx-auto max-w-md py-32 text-center">
-      <p className="mb-6 text-sm text-[#f6465d]">{message}</p>
-      <button
-        onClick={onRetry}
-        className="rounded bg-[#fcd535] px-6 py-2.5 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
-      >
-        Retry
-      </button>
+    <div className="mx-auto mt-28 max-w-md">
+      <div className="panel border-down/60">
+        <div className="panel-title border-down/60 text-down">
+          <span>Error</span>
+          <span>CODE: FETCH_FAIL</span>
+        </div>
+        <div className="p-4">
+          <p className="text-[13px] text-ink-2">
+            <span className="text-down">!</span> {message}
+          </p>
+          <button onClick={onRetry} className="btn-term mt-5">
+            ⟳ Retry
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

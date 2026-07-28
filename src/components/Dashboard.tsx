@@ -8,7 +8,7 @@ import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
 import PortfolioTable from "./PortfolioTable";
 import HoldingDetail from "./HoldingDetail";
-import Sidebar from "./Sidebar";
+import TopBar from "./TopBar";
 import CoinIcon from "./CoinIcon";
 
 const DcaAnalysis = dynamic(() => import("./DcaAnalysis"), { ssr: false });
@@ -252,6 +252,32 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [lastPriceUpdate]);
 
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    setSelectedAsset(null);
+    setSelectedDcaAsset(null);
+  }, []);
+
+  // Terminal keyboard shortcuts: 1/2/3 switch tabs, R refreshes
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+
+      if (e.key === "1") handleTabChange("overview");
+      else if (e.key === "2") handleTabChange("holdings");
+      else if (e.key === "3") handleTabChange("dca");
+      else if (e.key === "r" || e.key === "R") fetchPortfolio();
+      else if (e.key === "Escape") {
+        setSelectedAsset(null);
+        setSelectedDcaAsset(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleTabChange, fetchPortfolio]);
+
   const handleSelectHolding = (asset: string) => {
     setSelectedAsset(asset);
   };
@@ -260,7 +286,7 @@ export default function Dashboard() {
     setSelectedAsset(null);
   };
 
-  const pnlColor = portfolio && portfolio.totalPnL >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]";
+  const pnlColor = portfolio && portfolio.totalPnL >= 0 ? "text-up" : "text-down";
 
   // Main content based on loading state
   let content;
@@ -319,144 +345,105 @@ export default function Dashboard() {
     const topHoldings = portfolio.holdings.slice(0, 5);
 
     content = (
-      <div className="space-y-8">
-        {/* Balance header */}
-        <div>
-          <p className="mb-1 text-sm text-[#848e9c]">Your Estimated Balance</p>
-          <span className="text-4xl font-semibold text-white">
-            {formatUsd(portfolio.totalCurrentValue)}
-          </span>
-          <div className="mt-2 flex items-center gap-4">
-            <span className={`text-sm ${pnlColor}`}>
-              PnL&ensp;
-              {portfolio.totalPnL >= 0 ? "+" : ""}
-              {formatUsd(portfolio.totalPnL)}
-              {" "}({portfolio.totalPnLPercent >= 0 ? "+" : ""}
+      <div className="space-y-3">
+        {/* Tiled summary grid */}
+        <div className="grid grid-cols-12 gap-px border border-grid bg-grid">
+          {/* Balance readout */}
+          <div className="col-span-12 bg-panel p-4 lg:col-span-4">
+            <p className="text-[11px] tracking-[0.2em] text-amber">EST. BALANCE · USD</p>
+            <p className="mt-2 text-4xl font-bold tracking-tight text-ink">
+              {portfolio.totalCurrentValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className={`mt-2 text-[13px] ${pnlColor}`}>
+              {portfolio.totalPnL >= 0 ? "▲ +" : "▼ "}
+              {formatUsd(portfolio.totalPnL)} ({portfolio.totalPnLPercent >= 0 ? "+" : ""}
               {portfolio.totalPnLPercent.toFixed(2)}%)
-            </span>
-            <span className="text-xs text-[#5e6673]">
-              Invested {formatUsd(portfolio.totalInvested)}
-            </span>
+            </p>
           </div>
-        </div>
-
-        {/* Stats row */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="rounded-xl bg-[#1e2329] p-5">
-            <p className="text-xs text-[#848e9c]">Total Assets</p>
-            <p className="mt-1 text-xl font-semibold text-white">{portfolio.holdings.length}</p>
+          {/* Stat cells */}
+          <div className="col-span-6 bg-panel p-4 lg:col-span-2">
+            <p className="text-[11px] tracking-[0.2em] text-ink-3">ASSETS</p>
+            <p className="mt-2 text-xl text-ink">{portfolio.holdings.length}</p>
           </div>
-          <div className="rounded-xl bg-[#1e2329] p-5">
-            <p className="text-xs text-[#848e9c]">Total Invested</p>
-            <p className="mt-1 text-xl font-semibold text-white">{formatUsd(portfolio.totalInvested)}</p>
+          <div className="col-span-6 bg-panel p-4 lg:col-span-2">
+            <p className="text-[11px] tracking-[0.2em] text-ink-3">INVESTED</p>
+            <p className="mt-2 text-xl text-ink">{formatUsd(portfolio.totalInvested)}</p>
           </div>
-          <div className="rounded-xl bg-[#1e2329] p-5">
-            <p className="text-xs text-[#848e9c]">Unrealized PNL</p>
-            <p className={`mt-1 text-xl font-semibold ${pnlColor}`}>
+          <div className="col-span-6 bg-panel p-4 lg:col-span-2">
+            <p className="text-[11px] tracking-[0.2em] text-ink-3">UNRLZD PNL</p>
+            <p className={`mt-2 text-xl ${pnlColor}`}>
               {portfolio.totalPnL >= 0 ? "+" : ""}{formatUsd(portfolio.totalPnL)}
             </p>
           </div>
-          <div className="rounded-xl bg-[#1e2329] p-5">
-            <p className="text-xs text-[#848e9c]">USDT Balance</p>
-            <p className="mt-1 text-xl font-semibold text-white">{formatUsd(usdtBalance)}</p>
+          <div className="col-span-6 bg-panel p-4 lg:col-span-2">
+            <p className="text-[11px] tracking-[0.2em] text-ink-3">USDT FREE</p>
+            <p className="mt-2 text-xl text-ink">{formatUsd(usdtBalance)}</p>
           </div>
         </div>
 
-        {/* Top holdings card */}
-        <div className="rounded-xl bg-[#1e2329]">
-          <div className="flex items-center justify-between px-6 py-4">
-            <span className="text-sm font-medium text-white">Top Holdings</span>
+        {/* Top positions panel */}
+        <div className="panel">
+          <div className="panel-title">
+            <span>Top Positions</span>
             <button
               onClick={() => setActiveTab("holdings")}
-              className="text-xs text-[#f0b90b] transition-colors hover:text-[#fcd535]"
+              className="tracking-[0.15em] text-ink-2 transition-colors hover:text-amber"
             >
-              View All &gt;
+              [VIEW ALL]
             </button>
           </div>
-          <div>
-            {topHoldings.map((h, i) => (
-              <div
-                key={h.asset}
-                onClick={() => handleSelectHolding(h.asset)}
-                className={`flex cursor-pointer items-center justify-between px-6 py-3.5 transition-colors hover:bg-[#2b3139] ${
-                  i < topHoldings.length - 1 ? "border-b border-[#2b3139]" : ""
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <CoinIcon asset={h.asset} size={36} />
-                  <div>
-                    <span className="font-medium text-white">{h.asset}</span>
-                    <p className="text-xs text-[#5e6673]">{formatUsd(h.currentPrice)}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium text-white">{formatUsd(h.currentValue)}</p>
-                  <p className={`text-xs ${h.pnlPercent >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]"}`}>
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-grid text-left text-[11px] tracking-[0.15em] text-ink-3">
+                <th className="px-3 py-2 font-normal">#</th>
+                <th className="px-3 py-2 font-normal">SYM</th>
+                <th className="px-3 py-2 text-right font-normal">PRICE</th>
+                <th className="px-3 py-2 text-right font-normal">VALUE</th>
+                <th className="px-3 py-2 text-right font-normal">PNL%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topHoldings.map((h, i) => (
+                <tr
+                  key={h.asset}
+                  onClick={() => handleSelectHolding(h.asset)}
+                  className={`cursor-pointer transition-colors hover:bg-panel-2 ${
+                    i < topHoldings.length - 1 ? "border-b border-grid/60" : ""
+                  }`}
+                >
+                  <td className="px-3 py-2.5 text-ink-3">{String(i + 1).padStart(2, "0")}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <CoinIcon asset={h.asset} size={20} />
+                      <span className="font-bold text-ink">{h.asset}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-ink-2">{formatUsd(h.currentPrice)}</td>
+                  <td className="px-3 py-2.5 text-right text-ink">{formatUsd(h.currentValue)}</td>
+                  <td className={`px-3 py-2.5 text-right ${h.pnlPercent >= 0 ? "text-up" : "text-down"}`}>
                     {h.pnlPercent >= 0 ? "+" : ""}{h.pnlPercent.toFixed(2)}%
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <button
-            onClick={fetchPortfolio}
-            className="rounded-md bg-[#fcd535] px-5 py-2 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
-          >
-            Refresh
-          </button>
-          {lastPriceUpdate && (
-            <div className="flex items-center gap-2 text-xs text-[#848e9c]">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0ecb81] opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0ecb81]" />
-              </span>
-              Prices update every 60s
-              <span className="text-[#5e6673]">
-                &middot; {secondsAgo < 5 ? "just now" : `${secondsAgo}s ago`}
-              </span>
-            </div>
-          )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     );
   } else {
     // Holdings tab
     content = (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-medium text-white">All Holdings</h2>
-            <p className="text-xs text-[#848e9c]">
-              {portfolio.holdings.length} asset{portfolio.holdings.length !== 1 ? "s" : ""} &middot; Total value {formatUsd(portfolio.totalCurrentValue)}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={fetchPortfolio}
-              className="rounded-md bg-[#fcd535] px-5 py-2 text-sm font-medium text-[#202630] transition-colors hover:bg-[#f0b90b]"
-            >
-              Refresh
-            </button>
-            {lastPriceUpdate && (
-              <div className="flex items-center gap-2 text-xs text-[#848e9c]">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0ecb81] opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0ecb81]" />
-                </span>
-                {secondsAgo < 5 ? "just now" : `${secondsAgo}s ago`}
-              </div>
-            )}
-          </div>
+      <div className="panel">
+        <div className="panel-title">
+          <span>
+            Positions <span className="text-ink-3">/ {portfolio.holdings.length} ASSETS / {formatUsd(portfolio.totalCurrentValue)}</span>
+          </span>
         </div>
-
         {portfolio.holdings.length > 0 ? (
           <PortfolioTable holdings={portfolio.holdings} onSelectHolding={handleSelectHolding} />
         ) : (
-          <p className="py-10 text-center text-sm text-[#848e9c]">
-            No holdings found with USDT trading pairs.
+          <p className="px-3 py-10 text-center text-[13px] text-ink-2">
+            NO HOLDINGS FOUND WITH USDT TRADING PAIRS.
           </p>
         )}
       </div>
@@ -464,11 +451,27 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar activeTab={activeTab} onTabChange={(tab) => { setActiveTab(tab); setSelectedAsset(null); setSelectedDcaAsset(null); }} />
-      <main className="ml-60 flex-1 px-8 py-8">
-        {content}
+    <div className="flex min-h-screen flex-col">
+      <TopBar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        live={phase === "done"}
+        secondsAgo={lastPriceUpdate ? secondsAgo : null}
+        onRefresh={fetchPortfolio}
+      />
+      <main className="flex-1 px-4 py-4 pb-12">
+        <div className="mx-auto max-w-7xl">{content}</div>
       </main>
+
+      {/* Bottom status bar */}
+      <footer className="fixed bottom-0 left-0 right-0 z-20 flex h-7 items-center gap-4 border-t border-grid bg-panel px-4 text-[11px] tracking-[0.1em] text-ink-3">
+        <span className="text-amber">SRC: SPOT + EARN + AUTO-INVEST</span>
+        <span>│</span>
+        <span>PAIRS: USDT</span>
+        <span>│</span>
+        <span>AUTO-REFRESH: 60S</span>
+        <span className="ml-auto hidden sm:inline">KEYS: [1][2][3] NAV · [R] REFRESH</span>
+      </footer>
     </div>
   );
 }

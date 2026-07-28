@@ -24,25 +24,26 @@ function formatQty(value: number): string {
 }
 
 function pnlColor(value: number): string {
-  if (value > 0) return "text-[#0ecb81]";
-  if (value < 0) return "text-[#f6465d]";
-  return "text-[#848e9c]";
+  if (value > 0) return "text-up";
+  if (value < 0) return "text-down";
+  return "text-ink-2";
 }
 
 export default function PortfolioTable({ holdings, onSelectHolding }: PortfolioTableProps) {
   return (
-    <div className="rounded-xl bg-[#1e2329]">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto">
+      <table className="w-full text-[13px]">
         <thead>
-          <tr className="text-left text-xs text-[#848e9c]">
-            <th className="px-6 py-4 font-normal">Coin</th>
-            <th className="px-4 py-4 text-right font-normal">Amount</th>
-            <th className="px-4 py-4 text-right font-normal">Avg Cost</th>
-            <th className="px-4 py-4 text-right font-normal">Price</th>
-            <th className="px-4 py-4 text-right font-normal">Invested</th>
-            <th className="px-4 py-4 text-right font-normal">Value</th>
-            <th className="px-4 py-4 text-right font-normal">PNL</th>
-            <th className="px-6 py-4 text-right font-normal">PNL %</th>
+          <tr className="border-b border-grid text-left text-[11px] tracking-[0.15em] text-ink-3">
+            <th className="px-3 py-2 font-normal">#</th>
+            <th className="px-3 py-2 font-normal">SYM</th>
+            <th className="px-3 py-2 text-right font-normal">AMOUNT</th>
+            <th className="px-3 py-2 text-right font-normal">AVG COST</th>
+            <th className="px-3 py-2 text-right font-normal">PRICE</th>
+            <th className="px-3 py-2 text-right font-normal">INVESTED</th>
+            <th className="px-3 py-2 text-right font-normal">VALUE</th>
+            <th className="px-3 py-2 text-right font-normal">PNL</th>
+            <th className="px-3 py-2 text-right font-normal">PNL%</th>
           </tr>
         </thead>
         <tbody>
@@ -50,39 +51,37 @@ export default function PortfolioTable({ holdings, onSelectHolding }: PortfolioT
             <tr
               key={h.asset}
               onClick={() => onSelectHolding?.(h.asset)}
-              className={`cursor-pointer transition-colors hover:bg-[#2b3139] ${
-                i < holdings.length - 1 ? "border-b border-[#2b3139]" : ""
+              className={`cursor-pointer transition-colors hover:bg-panel-2 ${
+                i < holdings.length - 1 ? "border-b border-grid/60" : ""
               }`}
             >
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <CoinIcon asset={h.asset} />
-                  <div>
-                    <span className="font-medium text-white">{h.asset}</span>
-                    <span className="ml-1 text-xs text-[#5e6673]">{h.asset}</span>
-                  </div>
+              <td className="px-3 py-2.5 text-ink-3">{String(i + 1).padStart(2, "0")}</td>
+              <td className="px-3 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <CoinIcon asset={h.asset} size={20} />
+                  <span className="font-bold text-ink">{h.asset}</span>
                 </div>
               </td>
-              <td className="px-4 py-4 text-right text-[#eaecef]">
+              <td className="px-3 py-2.5 text-right text-ink-2">
                 {formatQty(h.quantity)}
               </td>
-              <td className="px-4 py-4 text-right text-[#eaecef]">
+              <td className="px-3 py-2.5 text-right text-ink-2">
                 {formatUsd(h.avgBuyCost)}
               </td>
-              <td className="px-4 py-4 text-right text-[#eaecef]">
+              <td className="px-3 py-2.5 text-right text-ink-2">
                 {formatUsd(h.currentPrice)}
               </td>
-              <td className="px-4 py-4 text-right text-[#eaecef]">
+              <td className="px-3 py-2.5 text-right text-ink-2">
                 {formatUsd(h.totalInvested)}
               </td>
-              <td className="px-4 py-4 text-right font-medium text-white">
+              <td className="px-3 py-2.5 text-right text-ink">
                 {formatUsd(h.currentValue)}
               </td>
-              <td className={`px-4 py-4 text-right ${pnlColor(h.unrealizedPnL)}`}>
+              <td className={`px-3 py-2.5 text-right ${pnlColor(h.unrealizedPnL)}`}>
                 {h.unrealizedPnL >= 0 ? "+" : ""}
                 {formatUsd(h.unrealizedPnL)}
               </td>
-              <td className={`px-6 py-4 text-right font-medium ${pnlColor(h.pnlPercent)}`}>
+              <td className={`px-3 py-2.5 text-right ${pnlColor(h.pnlPercent)}`}>
                 {h.pnlPercent >= 0 ? "+" : ""}
                 {h.pnlPercent.toFixed(2)}%
               </td>

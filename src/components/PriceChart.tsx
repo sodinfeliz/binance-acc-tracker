@@ -78,7 +78,7 @@ function createTradeMarkersPrimitive() {
               for (const p of pts) {
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
-                ctx.fillStyle = p.isBuy ? "#0ecb81" : "#f6465d";
+                ctx.fillStyle = p.isBuy ? "#00d68f" : "#ff3b5c";
                 ctx.fill();
                 ctx.fillStyle = "#fff";
                 ctx.fillText(p.isBuy ? "B" : "S", p.x, p.y);
@@ -146,33 +146,35 @@ export default function PriceChart({ symbol, avgBuyPrice, transactions }: PriceC
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: "#1e2329" },
-        textColor: "#848e9c",
+        background: { type: ColorType.Solid, color: "#0b0f13" },
+        textColor: "#8b97a3",
+        fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+        fontSize: 11,
       },
       grid: {
-        vertLines: { color: "#2b3139" },
-        horzLines: { color: "#2b3139" },
+        vertLines: { color: "rgba(255, 255, 255, 0.05)" },
+        horzLines: { color: "rgba(255, 255, 255, 0.05)" },
       },
       crosshair: {
-        vertLine: { color: "#f0b90b", width: 1, style: 2, labelBackgroundColor: "#f0b90b" },
-        horzLine: { color: "#f0b90b", width: 1, style: 2, labelBackgroundColor: "#f0b90b" },
+        vertLine: { color: "#f5a623", width: 1, style: 2, labelBackgroundColor: "#f5a623" },
+        horzLine: { color: "#f5a623", width: 1, style: 2, labelBackgroundColor: "#f5a623" },
       },
       timeScale: {
-        borderColor: "#2b3139",
+        borderColor: "#1d252d",
         timeVisible: true,
         secondsVisible: false,
       },
       rightPriceScale: {
-        borderColor: "#2b3139",
+        borderColor: "#1d252d",
       },
       handleScroll: { vertTouchDrag: false },
     });
 
     const series = chart.addSeries(AreaSeries, {
-      lineColor: "#f0b90b",
-      topColor: "rgba(240, 185, 11, 0.4)",
-      bottomColor: "rgba(240, 185, 11, 0.0)",
-      lineWidth: 2,
+      lineColor: "#f5a623",
+      topColor: "rgba(245, 166, 35, 0.22)",
+      bottomColor: "rgba(245, 166, 35, 0.0)",
+      lineWidth: 1,
     });
 
     const primitive = createTradeMarkersPrimitive();
@@ -207,7 +209,7 @@ export default function PriceChart({ symbol, avgBuyPrice, transactions }: PriceC
       if (!priceLineRef.current) {
         priceLineRef.current = seriesRef.current.createPriceLine({
           price: avgBuyPrice,
-          color: "#1e88e5",
+          color: "#3ec6f0",
           lineWidth: 1,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
@@ -307,42 +309,44 @@ export default function PriceChart({ symbol, avgBuyPrice, transactions }: PriceC
   }, [fetchData]);
 
   return (
-    <div className="rounded-xl bg-[#1e2329] p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-white">Price Chart</span>
-          {avgBuyPrice !== undefined && avgBuyPrice > 0 && (
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-[#848e9c]">
-              <input
-                type="checkbox"
-                checked={showAvgBuy}
-                onChange={(e) => setShowAvgBuy(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-[#2b3139] bg-[#2b3139] accent-[#1e88e5]"
-              />
-              Avg Buy
-            </label>
-          )}
-          {transactions && transactions.some((tx) => tx.source === "spot" && (tx.type === "buy" || tx.type === "sell")) && (
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-[#848e9c]">
-              <input
-                type="checkbox"
-                checked={showTrades}
-                onChange={(e) => setShowTrades(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-[#2b3139] bg-[#2b3139] accent-[#0ecb81]"
-              />
-              Trades
-            </label>
-          )}
+    <div className="panel">
+      <div className="panel-title">
+        <div className="flex items-center gap-5">
+          <span>Price Chart</span>
+          <div className="flex items-center gap-4 normal-case tracking-normal">
+            {avgBuyPrice !== undefined && avgBuyPrice > 0 && (
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-ink-2">
+                <input
+                  type="checkbox"
+                  checked={showAvgBuy}
+                  onChange={(e) => setShowAvgBuy(e.target.checked)}
+                  className="h-3 w-3 accent-[#3ec6f0]"
+                />
+                AVG BUY
+              </label>
+            )}
+            {transactions && transactions.some((tx) => tx.source === "spot" && (tx.type === "buy" || tx.type === "sell")) && (
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-ink-2">
+                <input
+                  type="checkbox"
+                  checked={showTrades}
+                  onChange={(e) => setShowTrades(e.target.checked)}
+                  className="h-3 w-3 accent-[#00d68f]"
+                />
+                TRADES
+              </label>
+            )}
+          </div>
         </div>
-        <div className="flex gap-1 rounded-lg bg-[#2b3139] p-1">
+        <div className="flex normal-case tracking-normal">
           {TIMEFRAMES.map((tf, i) => (
             <button
               key={tf.label}
               onClick={() => setActiveTimeframe(i)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              className={`border border-l-0 border-grid px-2.5 py-1 text-[11px] first:border-l transition-colors ${
                 activeTimeframe === i
-                  ? "bg-[#fcd535] text-[#202630]"
-                  : "text-[#848e9c] hover:text-white"
+                  ? "bg-amber text-bg"
+                  : "text-ink-2 hover:bg-panel-2 hover:text-ink"
               }`}
             >
               {tf.label}
@@ -350,16 +354,18 @@ export default function PriceChart({ symbol, avgBuyPrice, transactions }: PriceC
           ))}
         </div>
       </div>
-      <div className="relative">
+      <div className="relative p-2">
         <div ref={containerRef} style={{ height: 350 }} />
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#1e2329]/80">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#f0b90b] border-t-transparent" />
+          <div className="absolute inset-0 flex items-center justify-center bg-panel/80">
+            <p className="text-[13px] text-ink-2">
+              LOADING<span className="blink text-amber">▮</span>
+            </p>
           </div>
         )}
         {error && !loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#1e2329]/80">
-            <p className="text-sm text-[#f6465d]">{error}</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-panel/80">
+            <p className="text-[13px] text-down">! {error}</p>
           </div>
         )}
       </div>

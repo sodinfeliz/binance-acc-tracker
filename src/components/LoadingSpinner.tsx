@@ -6,9 +6,19 @@ interface LoadingSpinnerProps {
 
 export default function LoadingSpinner({ message }: LoadingSpinnerProps) {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-32">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#2b3139] border-t-[#f0b90b]" />
-      <p className="text-sm text-[#848e9c]">{message}</p>
+    <div className="mx-auto mt-28 max-w-md">
+      <div className="panel">
+        <div className="panel-title">
+          <span>System</span>
+          <span className="text-ink-3">STDOUT</span>
+        </div>
+        <div className="p-4 text-[13px]">
+          <p className="text-ink-2">
+            <span className="text-up">$</span> {message.toUpperCase()}
+            <span className="blink text-amber">▮</span>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

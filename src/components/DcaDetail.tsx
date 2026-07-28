@@ -106,24 +106,26 @@ export default function DcaDetail({ holding, trades, autoInvestTxs, dividends, o
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: "#1e2329" },
-        textColor: "#848e9c",
+        background: { type: ColorType.Solid, color: "#0b0f13" },
+        textColor: "#8b97a3",
+        fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+        fontSize: 11,
       },
       grid: {
-        vertLines: { color: "#2b3139" },
-        horzLines: { color: "#2b3139" },
+        vertLines: { color: "rgba(255, 255, 255, 0.05)" },
+        horzLines: { color: "rgba(255, 255, 255, 0.05)" },
       },
       crosshair: {
-        vertLine: { color: "#f0b90b", width: 1, style: 2, labelBackgroundColor: "#f0b90b" },
-        horzLine: { color: "#f0b90b", width: 1, style: 2, labelBackgroundColor: "#f0b90b" },
+        vertLine: { color: "#f5a623", width: 1, style: 2, labelBackgroundColor: "#f5a623" },
+        horzLine: { color: "#f5a623", width: 1, style: 2, labelBackgroundColor: "#f5a623" },
       },
       timeScale: {
-        borderColor: "#2b3139",
+        borderColor: "#1d252d",
         timeVisible: true,
         secondsVisible: false,
       },
       rightPriceScale: {
-        borderColor: "#2b3139",
+        borderColor: "#1d252d",
       },
       handleScroll: { vertTouchDrag: false },
     });
@@ -132,7 +134,7 @@ export default function DcaDetail({ holding, trades, autoInvestTxs, dividends, o
     const precision = getPricePrecision(minPrice);
 
     const avgCostSeries = chart.addSeries(LineSeries, {
-      color: "#f0b90b",
+      color: "#f5a623",
       lineWidth: 2,
       priceFormat: { type: "price", precision, minMove: 1 / Math.pow(10, precision) },
     });
@@ -151,7 +153,7 @@ export default function DcaDetail({ holding, trades, autoInvestTxs, dividends, o
     const priceInProfit = holding.currentPrice >= (stats?.avgCost ?? 0);
     avgCostSeries.createPriceLine({
       price: holding.currentPrice,
-      color: priceInProfit ? "#0ecb81" : "#f6465d",
+      color: priceInProfit ? "#00d68f" : "#ff3b5c",
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
       axisLabelVisible: true,
@@ -177,20 +179,18 @@ export default function DcaDetail({ holding, trades, autoInvestTxs, dividends, o
 
   if (!stats) {
     return (
-      <div className="space-y-8">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2b3139] text-[#848e9c] transition-colors hover:bg-[#3b4149] hover:text-white"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
+      <div className="panel">
+        <div className="panel-title">
+          <button onClick={onBack} className="tracking-[0.15em] text-ink-2 transition-colors hover:text-amber">
+            [ESC] BACK
           </button>
-          <CoinIcon asset={holding.asset} size={40} />
-          <h2 className="text-2xl font-semibold text-white">{holding.asset}</h2>
+          <span className="text-ink-3">DCA: {holding.symbol}</span>
         </div>
-        <p className="py-10 text-center text-sm text-[#848e9c]">No spot buy transactions found for this asset.</p>
+        <div className="flex items-center gap-3 p-4">
+          <CoinIcon asset={holding.asset} size={28} />
+          <span className="text-2xl font-bold tracking-tight text-ink">{holding.asset}</span>
+        </div>
+        <p className="px-4 pb-10 text-center text-[13px] text-ink-2">NO SPOT BUY TRANSACTIONS FOUND FOR THIS ASSET.</p>
       </div>
     );
   }
@@ -200,86 +200,97 @@ export default function DcaDetail({ holding, trades, autoInvestTxs, dividends, o
     : 0;
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2b3139] text-[#848e9c] transition-colors hover:bg-[#3b4149] hover:text-white"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <CoinIcon asset={holding.asset} size={40} />
-        <div>
+    <div className="space-y-3">
+      {/* Instrument readout */}
+      <div className="panel">
+        <div className="panel-title">
+          <button onClick={onBack} className="tracking-[0.15em] text-ink-2 transition-colors hover:text-amber">
+            [ESC] BACK
+          </button>
+          <span className="text-ink-3">DCA: {holding.symbol} · SPOT BUYS ONLY</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 p-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-semibold text-white">{holding.asset}</h2>
-            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${pnlPercent >= 0 ? "bg-[#0ecb81]/15 text-[#0ecb81]" : "bg-[#f6465d]/15 text-[#f6465d]"}`}>
-              {pnlPercent >= 0 ? "+" : ""}{pnlPercent.toFixed(2)}%
+            <CoinIcon asset={holding.asset} size={28} />
+            <span className="text-2xl font-bold tracking-tight text-ink">{holding.asset}</span>
+            <span className={`text-[13px] ${pnlPercent >= 0 ? "text-up" : "text-down"}`}>
+              {pnlPercent >= 0 ? "▲ +" : "▼ "}{pnlPercent.toFixed(2)}%
             </span>
           </div>
-          <p className="text-sm text-[#848e9c]">Spot buys only</p>
+          <div className="text-[13px]">
+            <span className="text-ink-3">AVG COST </span>
+            <span className="text-amber">{formatUsd(stats.avgCost)}</span>
+          </div>
+          <div className="text-[13px]">
+            <span className="text-ink-3">LAST </span>
+            <span className={holding.currentPrice >= stats.avgCost ? "text-up" : "text-down"}>
+              {holding.currentPrice >= stats.avgCost ? "▲ " : "▼ "}{formatUsd(holding.currentPrice)}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Total Buys" value={stats.numBuys.toString()} />
-        <StatCard label="Total Invested" value={formatUsd(stats.totalInvested)} />
-        <StatCard label="Avg Cost" value={formatUsd(stats.avgCost)} />
-        <StatCard
-          label="Cost Range"
-          value={`${formatUsd(stats.lowPrice)} - ${formatUsd(stats.highPrice)}`}
-          sub="Low - High"
+      {/* Stat grid */}
+      <div className="grid grid-cols-2 gap-px border border-grid bg-grid md:grid-cols-4">
+        <StatCell label="TOTAL BUYS" value={stats.numBuys.toString()} />
+        <StatCell label="INVESTED" value={formatUsd(stats.totalInvested)} />
+        <StatCell label="AVG COST" value={formatUsd(stats.avgCost)} />
+        <StatCell
+          label="COST RANGE"
+          value={`${formatUsd(stats.lowPrice)} – ${formatUsd(stats.highPrice)}`}
         />
-        <StatCard label="First Buy" value={formatDate(stats.firstBuyDate)} />
-        <StatCard label="Last Buy" value={formatDate(stats.lastBuyDate)} />
-        <StatCard label="Total Qty (Spot)" value={formatQty(stats.totalQty)} />
-        <StatCard
-          label="Current Price"
+        <StatCell label="FIRST BUY" value={formatDate(stats.firstBuyDate).toUpperCase()} />
+        <StatCell label="LAST BUY" value={formatDate(stats.lastBuyDate).toUpperCase()} />
+        <StatCell label="QTY (SPOT)" value={formatQty(stats.totalQty)} />
+        <StatCell
+          label="LAST PRICE"
           value={formatUsd(holding.currentPrice)}
-          color={holding.currentPrice >= stats.avgCost ? "text-[#0ecb81]" : "text-[#f6465d]"}
-          triangle={holding.currentPrice >= stats.avgCost ? "up" : "down"}
+          color={holding.currentPrice >= stats.avgCost ? "text-up" : "text-down"}
         />
       </div>
 
       {/* Cost Basis Chart */}
-      <div className="rounded-xl bg-[#1e2329] p-5">
-        <span className="mb-4 block text-sm font-medium text-white">Cost Basis Over Time</span>
-        <div ref={containerRef} style={{ height: 350 }} />
+      <div className="panel">
+        <div className="panel-title">
+          <span>Cost Basis Over Time</span>
+          <span className="text-ink-3">AVG COST / CURRENT</span>
+        </div>
+        <div className="p-2">
+          <div ref={containerRef} style={{ height: 350 }} />
+        </div>
       </div>
 
       {/* Spot Buy History */}
-      <div className="rounded-xl bg-[#1e2329]">
-        <div className="px-6 py-4">
-          <span className="text-sm font-medium text-white">Spot Buy History</span>
-          <span className="ml-2 text-xs text-[#5e6673]">{spotBuys.length} transactions</span>
+      <div className="panel">
+        <div className="panel-title">
+          <span>
+            Spot Buy History <span className="text-ink-3">/ {spotBuys.length}</span>
+          </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-[13px]">
             <thead>
-              <tr className="text-left text-xs text-[#848e9c]">
-                <th className="px-6 py-3 font-normal">Date</th>
-                <th className="px-4 py-3 text-right font-normal">Price</th>
-                <th className="px-4 py-3 text-right font-normal">Quantity</th>
-                <th className="px-4 py-3 text-right font-normal">Total</th>
-                <th className="px-6 py-3 text-right font-normal">Cost Basis</th>
+              <tr className="border-b border-grid text-left text-[11px] tracking-[0.15em] text-ink-3">
+                <th className="px-3 py-2 font-normal">DATE</th>
+                <th className="px-3 py-2 text-right font-normal">PRICE</th>
+                <th className="px-3 py-2 text-right font-normal">QTY</th>
+                <th className="px-3 py-2 text-right font-normal">TOTAL</th>
+                <th className="px-3 py-2 text-right font-normal">COST BASIS</th>
               </tr>
             </thead>
             <tbody>
               {spotBuys.map((tx, i) => (
                 <tr
                   key={tx.id}
-                  className={`transition-colors hover:bg-[#2b3139] ${
-                    i < spotBuys.length - 1 ? "border-b border-[#2b3139]" : ""
+                  className={`transition-colors hover:bg-panel-2 ${
+                    i < spotBuys.length - 1 ? "border-b border-grid/60" : ""
                   }`}
                 >
-                  <td className="px-6 py-3 text-[#eaecef]">{formatDateTime(tx.date)}</td>
-                  <td className="px-4 py-3 text-right text-[#eaecef]">{formatUsd(tx.price)}</td>
-                  <td className="px-4 py-3 text-right text-[#eaecef]">{formatQty(tx.quantity)}</td>
-                  <td className="px-4 py-3 text-right text-[#eaecef]">{formatUsd(tx.quoteAmount)}</td>
-                  <td className="px-6 py-3 text-right text-[#f0b90b]">{formatUsd(costBasisByIndex.get(i) ?? 0)}</td>
+                  <td className="px-3 py-2 text-ink-2">{formatDateTime(tx.date)}</td>
+                  <td className="px-3 py-2 text-right text-ink-2">{formatUsd(tx.price)}</td>
+                  <td className="px-3 py-2 text-right text-ink-2">{formatQty(tx.quantity)}</td>
+                  <td className="px-3 py-2 text-right text-ink">{formatUsd(tx.quoteAmount)}</td>
+                  <td className="px-3 py-2 text-right text-amber">{formatUsd(costBasisByIndex.get(i) ?? 0)}</td>
                 </tr>
               ))}
             </tbody>
@@ -290,17 +301,12 @@ export default function DcaDetail({ holding, trades, autoInvestTxs, dividends, o
   );
 }
 
-function StatCard({ label, value, sub, color, triangle }: { label: string; value: string; sub?: string; color?: string; triangle?: "up" | "down" }) {
+function StatCell({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
-    <div className="rounded-xl bg-[#1e2329] p-5">
-      <p className="text-xs text-[#848e9c]">{label}</p>
-      <p className={`mt-1 flex items-center gap-1.5 text-lg font-semibold ${color || "text-white"}`}>
-        {triangle && (
-          <span className="text-xs">{triangle === "up" ? "\u25B2" : "\u25BC"}</span>
-        )}
-        {value}
-      </p>
-      {sub && <p className="mt-0.5 text-xs text-[#5e6673]">{sub}</p>}
+    <div className="bg-panel p-4">
+      <p className="text-[11px] tracking-[0.2em] text-ink-3">{label}</p>
+      <p className={`mt-2 text-[15px] ${color || "text-ink"}`}>{value}</p>
+      {sub && <p className="mt-1 text-[11px] text-ink-3">{sub}</p>}
     </div>
   );
 }
