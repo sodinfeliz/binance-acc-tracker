@@ -6,7 +6,7 @@ A personal portfolio dashboard for tracking Binance spot holdings, earn position
 
 ## Features
 
-- **Overview** — Estimated balance, unrealized PnL, and top positions in a tiled panel grid
+- **Overview** — Estimated balance, unrealized PnL, top positions with allocation %, portfolio allocation bar, and top gainer/loser panels in a tiled grid
 - **Holdings** — Dense positions table with amount, avg cost, invested, value, and PnL per asset
 - **Holding Detail** — Per-asset instrument readout with price chart (lightweight-charts), avg-buy line, trade markers, and unified transaction history (spot / auto-invest / earn rewards)
 - **DCA Analysis** — Cost basis over time for spot buys: running avg cost chart, stats, and buy history with per-transaction cost basis

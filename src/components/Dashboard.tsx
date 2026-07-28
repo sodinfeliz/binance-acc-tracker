@@ -356,8 +356,23 @@ export default function Dashboard() {
       />
     );
   } else if (activeTab === "overview") {
-    // Top 5 holdings for the overview grid
-    const topHoldings = portfolio.holdings.slice(0, 5);
+    const topHoldings = portfolio.holdings.slice(0, 8);
+    const totalValue = portfolio.totalCurrentValue;
+
+    // Allocation: top 6 positions + everything else as OTHER
+    const ALLOC_COLORS = ["#f5a623", "#3ec6f0", "#b085ff", "#2dd4bf", "#6096ff", "#e8c06a"];
+    const allocTop = portfolio.holdings.slice(0, 6);
+    const otherValue = portfolio.holdings.slice(6).reduce((s, h) => s + h.currentValue, 0);
+    const allocRows = [
+      ...allocTop.map((h, i) => ({ label: h.asset, value: h.currentValue, color: ALLOC_COLORS[i] })),
+      ...(otherValue > 0 ? [{ label: "OTHER", value: otherValue, color: "#55606b" }] : []),
+    ];
+    const pct = (value: number) => (totalValue > 0 ? (value / totalValue) * 100 : 0);
+
+    // Movers by unrealized PnL%
+    const sortedByPnl = [...portfolio.holdings].sort((a, b) => b.pnlPercent - a.pnlPercent);
+    const topGainer = sortedByPnl[0];
+    const topLoser = sortedByPnl[sortedByPnl.length - 1];
 
     content = (
       <div className="space-y-3">
@@ -396,52 +411,127 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Top positions panel */}
-        <div className="panel">
-          <div className="panel-title">
-            <span>Top Positions</span>
-            <button
-              onClick={() => setActiveTab("holdings")}
-              className="tracking-[0.15em] text-ink-2 transition-colors hover:text-amber"
-            >
-              [VIEW ALL]
-            </button>
-          </div>
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b border-grid text-left text-[11px] tracking-[0.15em] text-ink-3">
-                <th className="px-3 py-2 font-normal">#</th>
-                <th className="px-3 py-2 font-normal">SYM</th>
-                <th className="px-3 py-2 text-right font-normal">PRICE</th>
-                <th className="px-3 py-2 text-right font-normal">VALUE</th>
-                <th className="px-3 py-2 text-right font-normal">PNL%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topHoldings.map((h, i) => (
-                <tr
-                  key={h.asset}
-                  onClick={() => handleSelectHolding(h.asset)}
-                  className={`cursor-pointer transition-colors hover:bg-panel-2 ${
-                    i < topHoldings.length - 1 ? "border-b border-grid/60" : ""
-                  }`}
-                >
-                  <td className="px-3 py-2.5 text-ink-3">{String(i + 1).padStart(2, "0")}</td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <CoinIcon asset={h.asset} size={20} />
-                      <span className="font-bold text-ink">{h.asset}</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-ink-2">{formatUsd(h.currentPrice)}</td>
-                  <td className="px-3 py-2.5 text-right text-ink">{formatUsd(h.currentValue)}</td>
-                  <td className={`px-3 py-2.5 text-right ${h.pnlPercent >= 0 ? "text-up" : "text-down"}`}>
-                    {h.pnlPercent >= 0 ? "+" : ""}{h.pnlPercent.toFixed(2)}%
-                  </td>
+        {/* Positions + allocation/movers */}
+        <div className="grid grid-cols-12 gap-3">
+          {/* Top positions panel */}
+          <div className="panel col-span-12 lg:col-span-7">
+            <div className="panel-title">
+              <span>Top Positions</span>
+              <button
+                onClick={() => setActiveTab("holdings")}
+                className="tracking-[0.15em] text-ink-2 transition-colors hover:text-amber"
+              >
+                [VIEW ALL]
+              </button>
+            </div>
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-grid text-left text-[11px] tracking-[0.15em] text-ink-3">
+                  <th className="px-3 py-2 font-normal">#</th>
+                  <th className="px-3 py-2 font-normal">SYM</th>
+                  <th className="px-3 py-2 text-right font-normal">PRICE</th>
+                  <th className="px-3 py-2 text-right font-normal">VALUE</th>
+                  <th className="px-3 py-2 text-right font-normal">ALLOC%</th>
+                  <th className="px-3 py-2 text-right font-normal">PNL%</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {topHoldings.map((h, i) => (
+                  <tr
+                    key={h.asset}
+                    onClick={() => handleSelectHolding(h.asset)}
+                    className={`cursor-pointer transition-colors hover:bg-panel-2 ${
+                      i < topHoldings.length - 1 ? "border-b border-grid/60" : ""
+                    }`}
+                  >
+                    <td className="px-3 py-2.5 text-ink-3">{String(i + 1).padStart(2, "0")}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <CoinIcon asset={h.asset} size={20} />
+                        <span className="font-bold text-ink">{h.asset}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-ink-2">{formatUsd(h.currentPrice)}</td>
+                    <td className="px-3 py-2.5 text-right text-ink">{formatUsd(h.currentValue)}</td>
+                    <td className="px-3 py-2.5 text-right text-ink-2">{pct(h.currentValue).toFixed(1)}%</td>
+                    <td className={`px-3 py-2.5 text-right ${h.pnlPercent >= 0 ? "text-up" : "text-down"}`}>
+                      {h.pnlPercent >= 0 ? "+" : ""}{h.pnlPercent.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Right column: allocation + movers */}
+          <div className="col-span-12 space-y-3 lg:col-span-5">
+            {/* Allocation panel */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>Allocation</span>
+                <span className="text-ink-3">% OF VALUE</span>
+              </div>
+              <div className="p-4">
+                <div className="flex h-3 w-full gap-[2px]">
+                  {allocRows.map((r) => (
+                    <div
+                      key={r.label}
+                      title={`${r.label} ${pct(r.value).toFixed(1)}%`}
+                      style={{ width: `${pct(r.value)}%`, background: r.color }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-4 space-y-2">
+                  {allocRows.map((r) => (
+                    <div key={r.label} className="flex items-center gap-2.5 text-[12px]">
+                      <span className="h-2 w-2 shrink-0" style={{ background: r.color }} />
+                      <span className="font-bold text-ink">{r.label}</span>
+                      <span className="ml-auto text-ink-2">{pct(r.value).toFixed(1)}%</span>
+                      <span className="w-26 text-right text-ink-3">{formatUsd(r.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Movers panel */}
+            {topGainer && topLoser && (
+              <div className="grid grid-cols-2 gap-px border border-grid bg-grid">
+                <div
+                  className="cursor-pointer bg-panel p-4 transition-colors hover:bg-panel-2"
+                  onClick={() => handleSelectHolding(topGainer.asset)}
+                >
+                  <p className="text-[11px] tracking-[0.2em] text-ink-3">TOP GAINER</p>
+                  <div className="mt-2.5 flex items-center gap-2.5">
+                    <CoinIcon asset={topGainer.asset} size={20} />
+                    <span className="font-bold text-ink">{topGainer.asset}</span>
+                    <span className={`ml-auto ${topGainer.pnlPercent >= 0 ? "text-up" : "text-down"}`}>
+                      {topGainer.pnlPercent >= 0 ? "▲ +" : "▼ "}{topGainer.pnlPercent.toFixed(2)}%
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-ink-3">
+                    {topGainer.unrealizedPnL >= 0 ? "+" : ""}{formatUsd(topGainer.unrealizedPnL)} PNL
+                  </p>
+                </div>
+                <div
+                  className="cursor-pointer bg-panel p-4 transition-colors hover:bg-panel-2"
+                  onClick={() => handleSelectHolding(topLoser.asset)}
+                >
+                  <p className="text-[11px] tracking-[0.2em] text-ink-3">TOP LOSER</p>
+                  <div className="mt-2.5 flex items-center gap-2.5">
+                    <CoinIcon asset={topLoser.asset} size={20} />
+                    <span className="font-bold text-ink">{topLoser.asset}</span>
+                    <span className={`ml-auto ${topLoser.pnlPercent >= 0 ? "text-up" : "text-down"}`}>
+                      {topLoser.pnlPercent >= 0 ? "▲ +" : "▼ "}{topLoser.pnlPercent.toFixed(2)}%
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-ink-3">
+                    {topLoser.unrealizedPnL >= 0 ? "+" : ""}{formatUsd(topLoser.unrealizedPnL)} PNL
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

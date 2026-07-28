@@ -283,8 +283,20 @@ async function main() {
 
   console.log("\nCapturing:");
 
-  // [1] Overview
-  await captureViewport(page, "overview");
+  // [1] Overview — fit the viewport to the content so the shot has no dead space
+  {
+    const contentHeight = await page.evaluate(() => {
+      const bottoms = [...document.querySelectorAll("main *")].map(
+        (el) => el.getBoundingClientRect().bottom
+      );
+      return Math.ceil(Math.max(...bottoms) + 16 + 28); // main padding + status bar
+    });
+    await page.setViewportSize({ width: VIEWPORT.width, height: contentHeight });
+    await page.waitForTimeout(400);
+    await captureViewport(page, "overview");
+    await page.setViewportSize(VIEWPORT);
+    await page.waitForTimeout(400);
+  }
 
   // [2] Holdings — just the positions panel
   await page.keyboard.press("2");
