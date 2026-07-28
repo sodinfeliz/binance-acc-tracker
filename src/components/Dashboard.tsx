@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { BinanceBalance, BinanceTrade, BinanceTickerPrice, BinanceAutoInvestTransaction, BinanceAssetDividend, PortfolioData } from "@/lib/types";
-import { buildPortfolio } from "@/lib/calculations";
+import { buildPortfolio, foldWrappedAssets, WRAPPED_ASSETS } from "@/lib/calculations";
 import dynamic from "next/dynamic";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
@@ -123,6 +123,15 @@ export default function Dashboard() {
       setPhase("trades");
       const symbols = assets.map((b) => `${b.asset}USDT`);
 
+      // Wrapped assets (e.g. WBETH) carry their cost basis on the underlying
+      // pair (ETHUSDT), so fetch the underlying's trades as well
+      for (const [wrapped, underlying] of Object.entries(WRAPPED_ASSETS)) {
+        const uSymbol = `${underlying}USDT`;
+        if (assets.some((b) => b.asset === wrapped) && !symbols.includes(uSymbol)) {
+          symbols.push(uSymbol);
+        }
+      }
+
       const [tradeResults, autoInvestTxs, earnRewards] = await Promise.all([
         Promise.allSettled(
           symbols.map(async (symbol) => {
@@ -189,16 +198,22 @@ export default function Dashboard() {
       }
       const prices: BinanceTickerPrice[] = await pricesRes.json();
 
-      cachedBalances.current = balances;
-      cachedTradesBySymbol.current = tradesBySymbol;
-      cachedAutoInvestByAsset.current = autoInvestByAsset;
+      // Fold wrapped/staked assets (e.g. WBETH → ETH) into their underlying asset
+      const folded = foldWrappedAssets(
+        { balances, tradesBySymbol, autoInvestByAsset, dividendsByAsset },
+        prices
+      );
+
+      cachedBalances.current = folded.balances;
+      cachedTradesBySymbol.current = folded.tradesBySymbol;
+      cachedAutoInvestByAsset.current = folded.autoInvestByAsset;
       cachedValidSymbols.current = validSymbols;
 
-      setRawTradesBySymbol(tradesBySymbol);
-      setRawAutoInvestByAsset(autoInvestByAsset);
-      setRawDividendsByAsset(dividendsByAsset);
+      setRawTradesBySymbol(folded.tradesBySymbol);
+      setRawAutoInvestByAsset(folded.autoInvestByAsset);
+      setRawDividendsByAsset(folded.dividendsByAsset);
 
-      const portfolioData = buildPortfolio(balances, tradesBySymbol, autoInvestByAsset, prices);
+      const portfolioData = buildPortfolio(folded.balances, folded.tradesBySymbol, folded.autoInvestByAsset, prices);
       setPortfolio(portfolioData);
       setLastPriceUpdate(Date.now());
       setPhase("done");

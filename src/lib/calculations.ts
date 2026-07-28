@@ -11,6 +11,119 @@ import {
   DcaDataPoint,
 } from "./types";
 
+// Wrapped/staked assets folded into their underlying asset (e.g. ETH staked as WBETH).
+// Quantities convert at the current market price ratio so position value is preserved,
+// while cost basis comes from the underlying asset's own buy history.
+export const WRAPPED_ASSETS: Record<string, string> = {
+  WBETH: "ETH",
+};
+
+export interface RawPortfolioInputs {
+  balances: BinanceBalance[];
+  tradesBySymbol: Record<string, BinanceTrade[]>;
+  autoInvestByAsset: Record<string, BinanceAutoInvestTransaction[]>;
+  dividendsByAsset: Record<string, BinanceAssetDividend[]>;
+}
+
+export function foldWrappedAssets(
+  inputs: RawPortfolioInputs,
+  prices: BinanceTickerPrice[]
+): RawPortfolioInputs {
+  const priceMap = new Map<string, number>();
+  for (const p of prices) {
+    priceMap.set(p.symbol, parseFloat(p.price));
+  }
+
+  const balances = inputs.balances.map((b) => ({ ...b }));
+  const tradesBySymbol = { ...inputs.tradesBySymbol };
+  const autoInvestByAsset = { ...inputs.autoInvestByAsset };
+  const dividendsByAsset = { ...inputs.dividendsByAsset };
+
+  for (const [wrapped, underlying] of Object.entries(WRAPPED_ASSETS)) {
+    const wrappedPrice = priceMap.get(`${wrapped}USDT`);
+    const underlyingPrice = priceMap.get(`${underlying}USDT`);
+    // Without both prices the conversion rate is unknown; leave the asset as-is
+    if (!wrappedPrice || !underlyingPrice) continue;
+    const rate = wrappedPrice / underlyingPrice;
+
+    const wSymbol = `${wrapped}USDT`;
+    const uSymbol = `${underlying}USDT`;
+
+    // Balance: convert to underlying-equivalent quantity and merge
+    const wIdx = balances.findIndex((b) => b.asset === wrapped);
+    if (wIdx >= 0) {
+      const w = balances[wIdx];
+      const equivFree = parseFloat(w.free) * rate;
+      const equivLocked = parseFloat(w.locked) * rate;
+      balances.splice(wIdx, 1);
+      const u = balances.find((b) => b.asset === underlying);
+      if (u) {
+        u.free = (parseFloat(u.free) + equivFree).toString();
+        u.locked = (parseFloat(u.locked) + equivLocked).toString();
+      } else {
+        balances.push({
+          asset: underlying,
+          free: equivFree.toString(),
+          locked: equivLocked.toString(),
+        });
+      }
+    }
+
+    // Spot trades on the wrapped pair: convert qty, keep the USDT amount spent
+    const wTrades = tradesBySymbol[wSymbol];
+    if (wTrades) {
+      const converted = wTrades.map((t) => {
+        const qty = parseFloat(t.qty) * rate;
+        const quoteQty = parseFloat(t.quoteQty);
+        return {
+          ...t,
+          symbol: uSymbol,
+          qty: qty.toString(),
+          price: qty > 0 ? (quoteQty / qty).toString() : t.price,
+          commission:
+            t.commissionAsset === wrapped
+              ? (parseFloat(t.commission) * rate).toString()
+              : t.commission,
+          commissionAsset: t.commissionAsset === wrapped ? underlying : t.commissionAsset,
+        };
+      });
+      tradesBySymbol[uSymbol] = [...(tradesBySymbol[uSymbol] || []), ...converted];
+      delete tradesBySymbol[wSymbol];
+    }
+
+    // Auto-invest plans targeting the wrapped asset
+    const wAuto = autoInvestByAsset[wrapped];
+    if (wAuto) {
+      const converted = wAuto.map((tx) => {
+        const target = parseFloat(tx.targetAssetAmount) * rate;
+        const source = parseFloat(tx.sourceAssetAmount);
+        return {
+          ...tx,
+          targetAsset: underlying,
+          targetAssetAmount: target.toString(),
+          executionPrice: target > 0 ? (source / target).toString() : tx.executionPrice,
+        };
+      });
+      autoInvestByAsset[underlying] = [...(autoInvestByAsset[underlying] || []), ...converted];
+      delete autoInvestByAsset[wrapped];
+    }
+
+    // Earn distributions paid in the wrapped asset
+    const wDivs = dividendsByAsset[wrapped];
+    if (wDivs) {
+      const converted = wDivs.map((d) => ({
+        ...d,
+        asset: underlying,
+        amount: (parseFloat(d.amount) * rate).toString(),
+      }));
+      dividendsByAsset[underlying] = [...(dividendsByAsset[underlying] || []), ...converted];
+      delete dividendsByAsset[wrapped];
+    }
+  }
+
+  return { balances, tradesBySymbol, autoInvestByAsset, dividendsByAsset };
+}
+
 export function calculateHolding(
   asset: string,
   symbol: string,
